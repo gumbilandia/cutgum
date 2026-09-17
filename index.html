@@ -95,6 +95,56 @@
     font-family: 'Space Grotesk', sans-serif;
     letter-spacing: 0.02em;
   }
+
+  .step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+  .step-circle {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    border: 1.5px solid var(--border);
+    color: var(--text-3);
+    background: var(--panel-soft);
+    transition: all .2s ease;
+    flex-shrink: 0;
+  }
+  .step-label {
+    font-size: 10.5px;
+    color: var(--text-3);
+    line-height: 1.2;
+    transition: color .2s ease;
+  }
+  .step-line {
+    flex: 1;
+    height: 1.5px;
+    background: var(--border);
+    align-self: center;
+    margin-top: -20px;
+    transition: background-color .2s ease;
+  }
+  .step.pending .step-circle { border-color: var(--border); color: var(--text-3); }
+  .step.active .step-circle {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+    animation: pulse-bar 1.4s ease-in-out infinite;
+  }
+  .step.active .step-label { color: var(--accent); font-weight: 600; }
+  .step.done .step-circle { border-color: var(--success); color: var(--success); background: var(--success-dim); }
+  .step.done .step-label { color: var(--success); }
+  .step.error .step-circle { border-color: var(--danger); color: var(--danger); background: var(--danger-dim); }
+  .step.error .step-label { color: var(--danger); }
 </style>
 </head>
 <body class="min-h-screen">
@@ -188,6 +238,7 @@
 
   <!-- Progreso -->
   <div id="progressSection" class="hidden mt-8 panel p-5">
+    <div id="stepIndicator" class="flex items-stretch justify-between mb-5 gap-2"></div>
     <div class="flex justify-between text-sm mb-2">
       <span id="progressMessage" class="text-[var(--text-2)]">Procesando...</span>
       <span id="progressPercent" class="text-[var(--accent)] font-semibold">0%</span>
@@ -220,12 +271,38 @@
 </div>
 
 <script>
-const { createFFmpeg, fetchFile } = FFmpeg;
+const { createFFmpeg } = FFmpeg;
 const ffmpeg = createFFmpeg({
   log: true,
   corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
-  logger: ({ message }) => appendLog(message),
+  logger: ({ message }) => {
+    appendLog(message);
+    // El log de ffmpeg imprime líneas tipo "frame=... time=00:00:12.34 ...".
+    // Usamos ese "time=" (tiempo de video ya codificado) contra la duración
+    // real del archivo para calcular un % de conversión que SIEMPRE avanza,
+    // incluso en salida HLS donde el ratio nativo de ffmpeg.wasm no sirve.
+    if (conversionInProgress && videoDurationSeconds > 0) {
+      const match = /time=(\d+:\d{2}:\d{2}(?:\.\d+)?)/.exec(message);
+      if (match) {
+        const elapsed = parseFfmpegTimeToSeconds(match[1]);
+        if (elapsed !== null) {
+          const pct = Math.min(99, Math.round((elapsed / videoDurationSeconds) * 100));
+          if (pct > lastKnownConvertPct) {
+            lastKnownConvertPct = pct;
+            setProgress(pct, `Convirtiendo video... (${formatSeconds(elapsed)} de ${formatSeconds(videoDurationSeconds)})`);
+          }
+        }
+      }
+    }
+  },
 });
+let lastKnownConvertPct = 0;
+
+function formatSeconds(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
 
 // Límite duro de tamaño de archivo aceptado. WebAssembly de 32 bits
 // direcciona como máximo ~4GB; un archivo de 3GB ya deja poco margen para
@@ -366,6 +443,100 @@ let ffmpegReady = false;
 let lastResultBlob = null;
 let lastResultName = '';
 let conversionInProgress = false;
+let videoDurationSeconds = 0; // duración real del video, para calcular % de conversión con precisión
+
+// --- Indicador de pasos (Subiendo -> Convirtiendo -> Empaquetando -> Listo) ---
+const STAGE_DEFS = [
+  { key: 'upload',   label: 'Subiendo archivo' },
+  { key: 'convert',  label: 'Convirtiendo' },
+  { key: 'package',  label: 'Empaquetando' },
+  { key: 'done',     label: 'Listo' },
+];
+const stepIndicatorEl = document.getElementById('stepIndicator');
+
+function renderStepIndicator() {
+  stepIndicatorEl.innerHTML = STAGE_DEFS.map((s, i) => `
+    ${i > 0 ? '<div class="step-line" data-line="' + i + '"></div>' : ''}
+    <div class="step pending" data-step="${s.key}">
+      <div class="step-circle">${i + 1}</div>
+      <div class="step-label">${s.label}</div>
+    </div>
+  `).join('');
+}
+renderStepIndicator();
+
+// Marca el paso actual como "activo", los anteriores como "completados" (✓)
+// y deja el resto en "pendiente". Así el usuario siempre sabe en qué etapa
+// está la conversión: subida, procesamiento, empaquetado o finalizado.
+function setStage(stageKey, opts = {}) {
+  const idx = STAGE_DEFS.findIndex((s) => s.key === stageKey);
+  STAGE_DEFS.forEach((s, i) => {
+    const el = stepIndicatorEl.querySelector(`[data-step="${s.key}"]`);
+    if (!el) return;
+    el.classList.remove('pending', 'active', 'done', 'error');
+    if (opts.error && i === idx) {
+      el.classList.add('error');
+      el.querySelector('.step-circle').textContent = '!';
+    } else if (i < idx || (i === idx && opts.complete)) {
+      el.classList.add('done');
+      el.querySelector('.step-circle').textContent = '✓';
+    } else if (i === idx) {
+      el.classList.add('active');
+      el.querySelector('.step-circle').textContent = String(i + 1);
+    } else {
+      el.classList.add('pending');
+      el.querySelector('.step-circle').textContent = String(i + 1);
+    }
+  });
+}
+
+// Lee el archivo con progreso REAL (evento onprogress de FileReader), en vez
+// de fetchFile() de ffmpeg.wasm que no informa avance alguno. Esto es lo que
+// el usuario ve como "proceso de subida": un porcentaje que efectivamente
+// avanza mientras el navegador carga el archivo a memoria.
+function readFileWithProgress(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    reader.onload = () => {
+      onProgress(1);
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo desde el disco.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// Obtiene la duración real del video (metadata del navegador) ANTES de
+// convertir. Con esto se calcula un % de conversión real leyendo el "time="
+// que ffmpeg imprime en su log, comparado contra esta duración — esto
+// funciona incluso para salida HLS, donde el callback ffmpeg.setProgress
+// casi nunca reporta un ratio útil y antes dejaba la barra "pegada".
+function readVideoDuration(file) {
+  return new Promise((resolve) => {
+    const videoEl = document.createElement('video');
+    videoEl.preload = 'metadata';
+    const url = URL.createObjectURL(file);
+    videoEl.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(isFinite(videoEl.duration) ? videoEl.duration : 0);
+    };
+    videoEl.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(0); // si falla, seguimos sin duración y usamos el ratio nativo como respaldo
+    };
+    videoEl.src = url;
+  });
+}
+
+// Convierte "00:01:23.45" (formato time= de ffmpeg) a segundos.
+function parseFfmpegTimeToSeconds(str) {
+  const m = /(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/.exec(str);
+  if (!m) return null;
+  return (parseInt(m[1], 10) * 3600) + (parseInt(m[2], 10) * 60) + parseFloat(m[3]);
+}
 
 const profileRadios = document.querySelectorAll('input[name="profile"]');
 const formatRadios = document.querySelectorAll('input[name="outputFormat"]');
@@ -471,18 +642,25 @@ convertBtn.addEventListener('click', async () => {
   const loudnorm = document.getElementById('loudnormToggle').checked;
 
   conversionInProgress = true;
+  lastKnownConvertPct = 0;
   setControlsEnabled(false);
   convertBtn.textContent = 'Convirtiendo...';
   progressSection.classList.remove('hidden');
   resultSection.classList.add('hidden');
   errorSection.classList.add('hidden');
   logBox.textContent = '';
+  renderStepIndicator();
+  setStage('upload');
   appendLog(`Perfil: ${profile.label} (${profile.size}, ${profile.videoBitrate}, audio ${profile.audioBitrate}/${profile.audioRate}Hz) — Salida: ${outputFormat.toUpperCase()}`);
-  setProgress(0, 'Cargando video en memoria...');
+  setProgress(0, 'Leyendo archivo (0 de ' + formatBytes(selectedFile.size) + ')...');
 
+  // Progreso de respaldo (ratio nativo de ffmpeg.wasm): solo se usa si no
+  // logramos leer la duración del video, ya que el ratio no es confiable
+  // para salida HLS (se queda "pegado"). El progreso principal se calcula
+  // más abajo a partir del "time=" real que ffmpeg imprime en su log.
   ffmpeg.setProgress(({ ratio }) => {
-    if (ratio >= 0 && ratio <= 1) {
-      setProgress(Math.round(ratio * 100), 'Codificando video...');
+    if (videoDurationSeconds === 0 && ratio >= 0 && ratio <= 1) {
+      setProgress(Math.round(ratio * 100), 'Convirtiendo video...');
     }
   });
 
@@ -494,11 +672,25 @@ convertBtn.addEventListener('click', async () => {
     safeUnlink('stream.m3u8');
     safeUnlink('output.mp4');
 
-    // fetchFile lee el archivo completo a un Uint8Array; es inevitable con
-    // ffmpeg.wasm 0.11 (necesita todo el input en el FS virtual antes de
-    // arrancar). Para minimizar el pico de memoria, no se guarda ninguna
-    // referencia extra al buffer una vez escrito.
-    const inputData = await fetchFile(selectedFile);
+    // Paso 1: lectura del archivo con progreso REAL en pantalla — esto es lo
+    // que el usuario ve como "se está subiendo" el video a memoria.
+    const inputData = await readFileWithProgress(selectedFile, (frac) => {
+      const pct = Math.round(frac * 100);
+      setProgress(pct, `Leyendo archivo... (${pct}%)`);
+    });
+    appendLog('Archivo leído por completo en memoria (' + formatBytes(selectedFile.size) + ').');
+
+    // Duración real del video (metadata del navegador), usada para calcular
+    // el % de conversión real más abajo, en vez de depender del ratio nativo.
+    videoDurationSeconds = await readVideoDuration(selectedFile);
+    if (videoDurationSeconds > 0) {
+      appendLog('Duración detectada: ' + formatSeconds(videoDurationSeconds) + '.');
+    } else {
+      appendLog('No se pudo detectar la duración exacta; el progreso de conversión usará una estimación aproximada.');
+    }
+
+    setStage('convert');
+    setProgress(0, 'Preparando conversión...');
     ffmpeg.FS('writeFile', 'input.mp4', inputData);
 
     const args = ['-i', 'input.mp4', '-vf', `scale=${profile.size}`,
@@ -538,13 +730,15 @@ convertBtn.addEventListener('click', async () => {
       args.push('-movflags', '+faststart', 'output.mp4');
     }
 
-    setProgress(1, 'Ejecutando FFmpeg (esto puede tardar varios minutos)...');
+    setProgress(0, 'Ejecutando FFmpeg (esto puede tardar varios minutos)...');
     await ffmpeg.run(...args);
 
     // Ya no se necesita el input en memoria: liberarlo antes de leer/empaquetar
     // la salida reduce el pico de memoria total durante el paso más pesado.
     safeUnlink('input.mp4');
 
+    setStage('convert', { complete: true });
+    setStage('package');
     setProgress(95, outputFormat === 'hls' ? 'Empaquetando resultados en ZIP...' : 'Preparando descarga...');
 
     if (outputFormat === 'hls') {
@@ -570,6 +764,8 @@ convertBtn.addEventListener('click', async () => {
       resultTitle.textContent = 'Conversión completada';
     }
 
+    setStage('package', { complete: true });
+    setStage('done', { complete: true });
     setProgress(100, 'Conversión completada.');
     resultSection.classList.remove('hidden');
   } catch (err) {
@@ -581,13 +777,18 @@ convertBtn.addEventListener('click', async () => {
     } else if (/abort/i.test(msg)) {
       msg = 'El motor FFmpeg.wasm se detuvo inesperadamente. Recarga la página e inténtalo de nuevo (puede deberse a un archivo muy pesado para el navegador).';
     }
-    showError(msg);
+    // Determina en qué paso ocurrió el error, para marcarlo en el stepper
+    // (así el usuario ve claramente si falló al subir, al convertir o al
+    // empaquetar, en vez de solo un mensaje de error genérico).
+    const failedStage = stepIndicatorEl.querySelector('.step.active')?.dataset.step || 'convert';
+    showError(msg, failedStage);
     // Limpieza defensiva del FS por si quedó algo a medio escribir
     safeUnlink('input.mp4');
     safeUnlink('stream.m3u8');
     safeUnlink('output.mp4');
   } finally {
     conversionInProgress = false;
+    videoDurationSeconds = 0;
     setControlsEnabled(true);
     resetButton();
   }
@@ -615,10 +816,11 @@ function setProgress(percent, message) {
   progressMessage.textContent = message;
 }
 
-function showError(msg) {
+function showError(msg, stageKey) {
   errorMessage.textContent = msg;
   errorSection.classList.remove('hidden');
-  progressSection.classList.add('hidden');
+  progressSection.classList.remove('hidden'); // dejamos visible el stepper para que se vea EN QUÉ PASO falló
+  if (stageKey) setStage(stageKey, { error: true });
 }
 
 function resetButton() {

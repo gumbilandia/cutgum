@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HLS Live Converter — MP4 a HLS o MP4 (100% en el navegador)</title>
+
+<!-- FFmpeg.wasm (single-thread, no requiere COOP/COEP) -->
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<!-- JSZip para empaquetar el .m3u8 + los .ts en un .zip descargable -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/3.4.1/tailwind.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-0: #070b14;
+    --bg-1: #0c1220;
+    --panel: #10182b;
+    --panel-soft: #0d1424;
+    --border: #212c47;
+    --border-soft: #1a2439;
+    --border-hover: #324066;
+    --text-1: #e9edf7;
+    --text-2: #9aa6c3;
+    --text-3: #64709590;
+    --accent: #2dd4e8;
+    --accent-2: #7dd3fc;
+    --accent-dim: rgba(45, 212, 232, 0.10);
+    --warn: #f2b544;
+    --warn-dim: rgba(242, 181, 68, 0.08);
+    --danger: #fb7691;
+    --danger-dim: rgba(251, 118, 145, 0.08);
+    --success: #3ddc9b;
+    --success-dim: rgba(61, 220, 155, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(45,212,232,0.10), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(125,211,252,0.06), transparent 55%),
+      var(--bg-0);
+    color: var(--text-1);
+  }
+
+  h1, .font-display { font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+  }
+
+  .note-card {
+    background: var(--panel-soft);
+    border: 1px solid var(--border-soft);
+    border-left: 3px solid var(--rail, var(--accent));
+    border-radius: 10px;
+  }
+
+  .option-card {
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    transition: border-color .15s ease, background-color .15s ease;
+  }
+  .option-card:hover { border-color: var(--border-hover); }
+  .option-card:has(input:checked) {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 16px;
+    background: var(--panel-soft);
+    transition: border-color .15s ease, background-color .15s ease;
+  }
+  .dropzone:hover { border-color: var(--border-hover); }
+  .dropzone.dragover { border-color: var(--accent); background-color: var(--accent-dim); }
+
+  @keyframes pulse-bar { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+  .pulse { animation: pulse-bar 1.4s ease-in-out infinite; }
+
+  #logBox { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  #logBox::-webkit-scrollbar { width: 6px; }
+  #logBox::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .kicker {
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.02em;
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<div class="max-w-3xl mx-auto px-4 py-10">
+
+  <header class="mb-8">
+    <p class="kicker text-[11px] font-semibold text-[var(--accent)] uppercase tracking-[0.14em] mb-2">Conversor local · sin servidor</p>
+    <h1 class="text-3xl font-bold tracking-tight text-[var(--text-1)]">HLS Live Converter</h1>
+    <p class="text-[var(--text-2)] mt-2 text-sm leading-relaxed max-w-lg">MP4 → HLS (.m3u8 + .ts) o MP4 optimizado, procesado 100% en tu navegador. El video nunca sale de tu equipo.</p>
+    <p id="ffmpegStatus" class="text-xs text-[var(--warn)] mt-3 inline-flex items-center gap-1.5">Cargando motor FFmpeg.wasm...</p>
+  </header>
+
+  <div class="mb-8 grid gap-3">
+    <!-- Aviso sobre límites reales del navegador -->
+    <div class="note-card p-4 text-xs text-[var(--text-2)] leading-relaxed" style="--rail: var(--warn);">
+      <p class="font-semibold text-[var(--warn)] mb-1 flex items-center gap-1.5">Límite real de memoria del navegador</p>
+      <p>Este conversor corre con WebAssembly de 32 bits, que direcciona como máximo ~4&nbsp;GB de memoria (video de entrada + búferes + salida). Acepta archivos de hasta <strong class="text-[var(--text-1)]">3&nbsp;GB</strong>, pero mientras más grande el archivo y más perfil de calidad alto elijas, mayor riesgo de que el navegador se quede sin memoria (sobre todo en equipos con poca RAM o en el celular). Si falla, probá con el perfil Estándar 720p, cerrá otras pestañas, o usá un archivo más liviano.</p>
+    </div>
+
+    <!-- Nota: no incluye descarga desde YouTube -->
+    <div class="note-card p-4 text-xs text-[var(--text-2)] leading-relaxed" style="--rail: var(--border-hover);">
+      Esta herramienta no incluye descarga de videos de YouTube por link: eso requiere un servidor (yt-dlp no corre en el navegador) y puede chocar con los Términos de Servicio de YouTube según el contenido. Subí acá el archivo .mp4 que ya tengas (grabado por vos, con licencia, exportado de tu editor, etc.).
+    </div>
+  </div>
+
+  <!-- Dropzone -->
+  <div id="dropzone" class="dropzone p-10 text-center cursor-pointer">
+    <input type="file" id="fileInput" accept="video/mp4,.mp4" class="hidden" />
+    <div id="dropzoneContent">
+      <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-11 w-11 text-[var(--text-3)] mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </svg>
+      <p class="text-[var(--text-1)] font-medium">Arrastra tu archivo .mp4 aquí</p>
+      <p class="text-[var(--text-2)] text-sm mt-1">o haz clic para seleccionar un archivo (máx. 3 GB)</p>
+    </div>
+    <div id="fileSelected" class="hidden">
+      <p class="text-[var(--accent)] font-medium" id="fileName"></p>
+      <p class="text-[var(--text-2)] text-sm" id="fileSize"></p>
+      <p id="fileSizeWarning" class="hidden text-[var(--warn)] text-xs mt-1"></p>
+    </div>
+  </div>
+
+  <!-- Opciones -->
+  <div class="mt-8 grid gap-6">
+
+    <div>
+      <label class="block text-sm font-semibold text-[var(--text-1)] mb-3">Formato de salida</label>
+      <div class="grid grid-cols-2 gap-3">
+        <label class="option-card flex items-center gap-2.5 p-4 cursor-pointer">
+          <input type="radio" name="outputFormat" value="hls" checked class="accent-[#2dd4e8]" />
+          <div>
+            <p class="font-semibold text-sm text-[var(--text-1)]">HLS (.m3u8 + .ts)</p>
+            <p class="text-xs text-[var(--text-2)]">Para streaming, se descarga en .zip</p>
+          </div>
+        </label>
+        <label class="option-card flex items-center gap-2.5 p-4 cursor-pointer">
+          <input type="radio" name="outputFormat" value="mp4" class="accent-[#2dd4e8]" />
+          <div>
+            <p class="font-semibold text-sm text-[var(--text-1)]">MP4 optimizado</p>
+            <p class="text-xs text-[var(--text-2)]">Un solo archivo .mp4 re-codificado</p>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-semibold text-[var(--text-1)] mb-2">Perfil de calidad</label>
+      <p class="text-xs text-[var(--text-2)] mb-3 leading-relaxed">Cada perfil trae su configuración predeterminada completa. Al seleccionarlo, la conversión se ejecuta con TODOS los valores que se listan en su tarjeta — no hace falta tocar nada más.</p>
+      <div id="profileOptions" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Las tarjetas de perfil (con su lista completa de configuración) se generan dinámicamente en JS a partir del mismo objeto PROFILES que usa FFmpeg, para que lo que se muestra sea siempre exactamente lo que se aplica. -->
+      </div>
+    </div>
+
+    <div class="option-card flex items-center justify-between p-4">
+      <div>
+        <p class="font-semibold text-[var(--text-1)] text-sm">Normalizar audio (-14 LUFS)</p>
+        <p class="text-xs text-[var(--text-2)] mt-0.5">Evita descompensaciones de volumen entre videos</p>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+        <input type="checkbox" id="loudnormToggle" class="sr-only peer" />
+        <div class="w-11 h-6 bg-[var(--border)] rounded-full peer peer-checked:bg-[var(--accent)] transition-colors"></div>
+        <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-5"></div>
+      </label>
+    </div>
+
+    <button id="convertBtn" disabled class="w-full py-3 rounded-xl font-semibold bg-[var(--accent)] text-[#04141a] hover:bg-[var(--accent-2)] disabled:bg-[var(--panel)] disabled:text-[var(--text-3)] disabled:cursor-not-allowed transition-colors">
+      Convertir
+    </button>
+  </div>
+
+  <!-- Progreso -->
+  <div id="progressSection" class="hidden mt-8 panel p-5">
+    <div class="flex justify-between text-sm mb-2">
+      <span id="progressMessage" class="text-[var(--text-2)]">Procesando...</span>
+      <span id="progressPercent" class="text-[var(--accent)] font-semibold">0%</span>
+    </div>
+    <div class="w-full bg-[var(--border-soft)] rounded-full h-2.5 overflow-hidden">
+      <div id="progressBar" class="h-2.5 rounded-full transition-all duration-300 pulse" style="width:0%; background: linear-gradient(90deg, var(--accent), var(--accent-2));"></div>
+    </div>
+    <pre id="logBox" class="mt-4 h-32 overflow-y-auto text-[11px] leading-tight text-[var(--text-3)] bg-[var(--panel-soft)] border border-[var(--border-soft)] rounded-lg p-3 whitespace-pre-wrap"></pre>
+  </div>
+
+  <!-- Resultado -->
+  <div id="resultSection" class="hidden mt-8 text-center note-card p-6" style="--rail: var(--success);">
+    <p class="text-[var(--success)] font-semibold mb-3" id="resultTitle">Conversión completada</p>
+    <button id="downloadBtn" class="inline-block bg-[var(--success)] hover:brightness-110 text-[#04211a] font-semibold px-6 py-3 rounded-lg transition-all">
+      Descargar resultado
+    </button>
+  </div>
+
+  <!-- Error -->
+  <div id="errorSection" class="hidden mt-8 text-center note-card p-6" style="--rail: var(--danger);">
+    <p class="text-[var(--danger)] font-semibold" id="errorMessage">Ocurrió un error.</p>
+  </div>
+
+  <footer class="mt-10 pt-6 border-t border-[var(--border-soft)] text-center text-xs text-[var(--text-3)] leading-relaxed">
+    Este archivo es 100% estático: HTML + JS. La conversión corre localmente con
+    FFmpeg.wasm; el video nunca sale de tu navegador. Debe servirse por
+    http/https (no funciona abriendo el archivo directamente con file://).
+  </footer>
+
+</div>
+
+<script>
+const { createFFmpeg, fetchFile } = FFmpeg;
+const ffmpeg = createFFmpeg({
+  log: true,
+  corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+  logger: ({ message }) => appendLog(message),
+});
+
+// Límite duro de tamaño de archivo aceptado. WebAssembly de 32 bits
+// direcciona como máximo ~4GB; un archivo de 3GB ya deja poco margen para
+// buffers intermedios y salida, así que este es el techo aceptado, con
+// aviso explícito al usuario en la UI.
+const MAX_FILE_BYTES = 3 * 1024 * 1024 * 1024; // 3 GB
+const LARGE_FILE_WARN_BYTES = 1.5 * 1024 * 1024 * 1024; // aviso a partir de 1.5 GB
+
+// Duración de segmento HLS — compartida por ambos perfiles según el spec.
+const HLS_SEGMENT_SECONDS = 4;
+
+// Cada perfil trae su configuración COMPLETA y autocontenida.
+// Al elegir un perfil en la UI, se usa este objeto entero — nunca se mezclan
+// valores entre perfiles. Esta misma fuente de datos es la que llena las
+// tarjetas visibles en pantalla (ver renderProfiles), así que lo que el
+// usuario ve siempre coincide exactamente con lo que se le aplica a FFmpeg.
+const PROFILES = {
+  standard: {
+    key: 'standard',
+    label: 'Estándar',
+    tag: '720p',
+    hint: 'Recomendado para streaming 24/7, TV web y archivos grandes',
+    size: '1280:720',
+    videoBitrate: '2000k',
+    maxrate: '2200k',
+    bufsize: '4400k',
+    fps: 30,
+    gop: 60,
+    level: '4.1',
+    audioBitrate: '128k',
+    audioRate: 44100,
+  },
+  high: {
+    key: 'high',
+    label: 'Alta Calidad',
+    tag: '1080p',
+    hint: 'Para pantallas grandes y eventos principales',
+    size: '1920:1080',
+    videoBitrate: '3500k',
+    maxrate: '4500k',
+    bufsize: '9000k',
+    fps: 30,
+    gop: 60,
+    level: '4.2',
+    audioBitrate: '160k',
+    audioRate: 48000,
+  },
+};
+
+// Convierte los campos "crudos" del perfil (los mismos que se le pasan a
+// FFmpeg) en la lista legible que se muestra en la tarjeta. Al derivarse de
+// los mismos valores, la UI nunca puede quedar desincronizada de lo que
+// realmente se ejecuta.
+function buildSpecLines(p) {
+  const [w, h] = p.size.split(':');
+  const gopSeconds = p.gop / p.fps;
+  const audioKHz = (p.audioRate / 1000).toString().replace(/\.0$/, '');
+  return [
+    `Resolución: ${w}x${h}`,
+    `Códec de video: H.264 (Profile High, Level ${p.level})`,
+    `Bitrate de video: ${parseInt(p.videoBitrate)} kbps (Maxrate: ${parseInt(p.maxrate)}k, Bufsize: ${parseInt(p.bufsize)}k)`,
+    `Framerate (FPS): ${p.fps} fps`,
+    `Keyframe Interval (GOP): cada ${gopSeconds}s exactos (-g ${p.gop} -keyint_min ${p.gop} -sc_threshold 0)`,
+    `Códec de audio: AAC-LC a ${parseInt(p.audioBitrate)} kbps, ${audioKHz} kHz (Stereo)`,
+  ];
+}
+
+function renderProfiles() {
+  const container = document.getElementById('profileOptions');
+  container.innerHTML = '';
+  Object.values(PROFILES).forEach((profile, idx) => {
+    const label = document.createElement('label');
+    label.className = 'option-card flex flex-col gap-3 p-4 cursor-pointer';
+
+    const specLines = buildSpecLines(profile);
+    const isHls = getOutputFormat() === 'hls';
+    const lines = isHls
+      ? [...specLines, `Duración del segmento HLS: ${HLS_SEGMENT_SECONDS} segundos`]
+      : specLines;
+    const specItems = lines.map((line) => `<li class="flex gap-1.5"><span class="text-[var(--accent)]">•</span><span>${line}</span></li>`).join('');
+
+    label.innerHTML = `
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <input type="radio" name="profile" value="${profile.key}" ${idx === 0 ? 'checked' : ''} class="accent-[#2dd4e8]" />
+          <span class="font-semibold text-[var(--text-1)]">${profile.label}</span>
+        </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[var(--accent-dim)] text-[var(--accent)]">${profile.tag}</span>
+      </div>
+      <p class="text-xs text-[var(--text-2)] -mt-2">${profile.hint}</p>
+      <ul class="text-xs text-[var(--text-2)] space-y-1 leading-relaxed">${specItems}</ul>
+    `;
+    container.appendChild(label);
+  });
+}
+
+renderProfiles();
+
+function getSelectedProfile() {
+  const checked = document.querySelector('input[name="profile"]:checked');
+  const key = checked ? checked.value : 'standard';
+  const profile = PROFILES[key];
+  if (!profile) {
+    // Nunca debería ocurrir (siempre hay un radio marcado por defecto),
+    // pero por seguridad caemos al perfil estándar en vez de fallar.
+    return PROFILES.standard;
+  }
+  return profile;
+}
+
+function getOutputFormat() {
+  const checked = document.querySelector('input[name="outputFormat"]:checked');
+  return checked ? checked.value : 'hls';
+}
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const dropzoneContent = document.getElementById('dropzoneContent');
+const fileSelected = document.getElementById('fileSelected');
+const fileNameEl = document.getElementById('fileName');
+const fileSizeEl = document.getElementById('fileSize');
+const fileSizeWarningEl = document.getElementById('fileSizeWarning');
+const convertBtn = document.getElementById('convertBtn');
+const progressSection = document.getElementById('progressSection');
+const progressBar = document.getElementById('progressBar');
+const progressPercent = document.getElementById('progressPercent');
+const progressMessage = document.getElementById('progressMessage');
+const resultSection = document.getElementById('resultSection');
+const resultTitle = document.getElementById('resultTitle');
+const downloadBtn = document.getElementById('downloadBtn');
+const errorSection = document.getElementById('errorSection');
+const errorMessage = document.getElementById('errorMessage');
+const ffmpegStatus = document.getElementById('ffmpegStatus');
+const logBox = document.getElementById('logBox');
+
+let selectedFile = null;
+let ffmpegReady = false;
+let lastResultBlob = null;
+let lastResultName = '';
+let conversionInProgress = false;
+
+const profileRadios = document.querySelectorAll('input[name="profile"]');
+const formatRadios = document.querySelectorAll('input[name="outputFormat"]');
+const loudnormToggleEl = document.getElementById('loudnormToggle');
+
+formatRadios.forEach((r) => r.addEventListener('change', renderProfiles));
+
+function setControlsEnabled(enabled) {
+  dropzone.style.pointerEvents = enabled ? 'auto' : 'none';
+  dropzone.style.opacity = enabled ? '1' : '0.6';
+  profileRadios.forEach((r) => { r.disabled = !enabled; });
+  formatRadios.forEach((r) => { r.disabled = !enabled; });
+  loudnormToggleEl.disabled = !enabled;
+  convertBtn.disabled = !enabled || !selectedFile || !ffmpegReady;
+}
+
+function appendLog(msg) {
+  if (!logBox) return;
+  logBox.textContent += msg + '\n';
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+function formatBytes(bytes) {
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return gb.toFixed(2) + ' GB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function initFfmpeg() {
+  try {
+    ffmpegStatus.textContent = 'Cargando motor FFmpeg.wasm...';
+    ffmpegStatus.style.color = 'var(--warn)';
+    if (!ffmpeg.isLoaded()) {
+      await ffmpeg.load();
+    }
+    ffmpegReady = true;
+    ffmpegStatus.textContent = 'Motor FFmpeg.wasm listo';
+    ffmpegStatus.style.color = 'var(--success)';
+    convertBtn.disabled = !selectedFile;
+  } catch (err) {
+    ffmpegReady = false;
+    ffmpegStatus.innerHTML = 'No se pudo cargar FFmpeg.wasm: ' + err.message +
+      ' — <button id="retryFfmpeg" class="underline" style="color: var(--accent)">reintentar</button>';
+    ffmpegStatus.style.color = 'var(--danger)';
+    const retryBtn = document.getElementById('retryFfmpeg');
+    if (retryBtn) retryBtn.addEventListener('click', initFfmpeg);
+  }
+}
+
+initFfmpeg();
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+function handleFile(file) {
+  if (conversionInProgress) return;
+  if (!file.name.toLowerCase().endsWith('.mp4') && file.type !== 'video/mp4') {
+    alert('Por favor selecciona un archivo .mp4');
+    return;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    alert('El archivo pesa ' + formatBytes(file.size) + ', supera el máximo aceptado de 3 GB.');
+    return;
+  }
+  selectedFile = file;
+  lastResultBlob = null;
+  dropzoneContent.classList.add('hidden');
+  fileSelected.classList.remove('hidden');
+  fileNameEl.textContent = file.name;
+  fileSizeEl.textContent = formatBytes(file.size);
+
+  if (file.size > LARGE_FILE_WARN_BYTES) {
+    fileSizeWarningEl.textContent = '⚠️ Archivo pesado: en equipos con poca memoria RAM la conversión puede fallar. Se recomienda el perfil Estándar 720p.';
+    fileSizeWarningEl.classList.remove('hidden');
+  } else {
+    fileSizeWarningEl.classList.add('hidden');
+  }
+
+  convertBtn.disabled = !ffmpegReady;
+  resultSection.classList.add('hidden');
+  errorSection.classList.add('hidden');
+  progressSection.classList.add('hidden');
+}
+
+convertBtn.addEventListener('click', async () => {
+  if (!selectedFile || !ffmpegReady || conversionInProgress) return;
+
+  // La config completa del perfil y el formato de salida se fijan UNA sola
+  // vez, al iniciar, con el valor seleccionado en ese momento. Cambiar los
+  // controles durante la conversión no puede afectar un proceso ya en curso
+  // (los controles se bloquean abajo).
+  const profile = getSelectedProfile();
+  const outputFormat = getOutputFormat();
+  const loudnorm = document.getElementById('loudnormToggle').checked;
+
+  conversionInProgress = true;
+  setControlsEnabled(false);
+  convertBtn.textContent = 'Convirtiendo...';
+  progressSection.classList.remove('hidden');
+  resultSection.classList.add('hidden');
+  errorSection.classList.add('hidden');
+  logBox.textContent = '';
+  appendLog(`Perfil: ${profile.label} (${profile.size}, ${profile.videoBitrate}, audio ${profile.audioBitrate}/${profile.audioRate}Hz) — Salida: ${outputFormat.toUpperCase()}`);
+  setProgress(0, 'Cargando video en memoria...');
+
+  ffmpeg.setProgress(({ ratio }) => {
+    if (ratio >= 0 && ratio <= 1) {
+      setProgress(Math.round(ratio * 100), 'Codificando video...');
+    }
+  });
+
+  const outputName = outputFormat === 'hls' ? 'stream.m3u8' : 'output.mp4';
+
+  try {
+    // Limpiar FS de una conversión anterior (ignora errores si no existen)
+    safeUnlink('input.mp4');
+    safeUnlink('stream.m3u8');
+    safeUnlink('output.mp4');
+
+    // fetchFile lee el archivo completo a un Uint8Array; es inevitable con
+    // ffmpeg.wasm 0.11 (necesita todo el input en el FS virtual antes de
+    // arrancar). Para minimizar el pico de memoria, no se guarda ninguna
+    // referencia extra al buffer una vez escrito.
+    const inputData = await fetchFile(selectedFile);
+    ffmpeg.FS('writeFile', 'input.mp4', inputData);
+
+    const args = ['-i', 'input.mp4', '-vf', `scale=${profile.size}`,
+      '-pix_fmt', 'yuv420p', // compatibilidad máxima con reproductores HLS/TV
+      '-preset', 'veryfast', // evita codificaciones eternas dentro del navegador
+      '-c:v', 'libx264',
+      '-profile:v', 'high',
+      '-level:v', profile.level,
+      '-b:v', profile.videoBitrate,
+      '-maxrate', profile.maxrate,
+      '-bufsize', profile.bufsize,
+      '-r', String(profile.fps),
+      '-g', String(profile.gop),
+      '-keyint_min', String(profile.gop),
+      '-sc_threshold', '0',
+      '-c:a', 'aac',
+      '-b:a', profile.audioBitrate,
+      '-ar', String(profile.audioRate),
+      '-ac', '2',
+    ];
+
+    if (loudnorm) {
+      args.push('-af', 'loudnorm=I=-14:LRA=11:TP=-1.5');
+    }
+
+    if (outputFormat === 'hls') {
+      args.push(
+        '-hls_time', String(HLS_SEGMENT_SECONDS),
+        '-hls_playlist_type', 'vod',
+        '-hls_flags', 'independent_segments',
+        '-hls_segment_filename', 'segmento_%03d.ts',
+        'stream.m3u8'
+      );
+    } else {
+      // MP4 con faststart: mueve el moov atom al inicio para que se pueda
+      // reproducir en streaming progresivo antes de descargar el archivo completo.
+      args.push('-movflags', '+faststart', 'output.mp4');
+    }
+
+    setProgress(1, 'Ejecutando FFmpeg (esto puede tardar varios minutos)...');
+    await ffmpeg.run(...args);
+
+    // Ya no se necesita el input en memoria: liberarlo antes de leer/empaquetar
+    // la salida reduce el pico de memoria total durante el paso más pesado.
+    safeUnlink('input.mp4');
+
+    setProgress(95, outputFormat === 'hls' ? 'Empaquetando resultados en ZIP...' : 'Preparando descarga...');
+
+    if (outputFormat === 'hls') {
+      const files = ffmpeg.FS('readdir', '/').filter(
+        (name) => name === 'stream.m3u8' || /^segmento_\d+\.ts$/.test(name)
+      );
+      if (!files.length) throw new Error('No se generaron archivos HLS. Revisa el log.');
+
+      const zip = new JSZip();
+      files.forEach((name) => {
+        const data = ffmpeg.FS('readFile', name);
+        zip.file(name, data);
+        safeUnlink(name); // liberar del FS virtual apenas se copia al zip
+      });
+      lastResultBlob = await zip.generateAsync({ type: 'blob' });
+      lastResultName = 'hls_output.zip';
+      resultTitle.textContent = `Conversión completada (${files.length} archivos)`;
+    } else {
+      const data = ffmpeg.FS('readFile', 'output.mp4');
+      lastResultBlob = new Blob([data.buffer], { type: 'video/mp4' });
+      lastResultName = (selectedFile.name.replace(/\.mp4$/i, '') || 'video') + '_convertido.mp4';
+      safeUnlink('output.mp4');
+      resultTitle.textContent = 'Conversión completada';
+    }
+
+    setProgress(100, 'Conversión completada.');
+    resultSection.classList.remove('hidden');
+  } catch (err) {
+    console.error(err);
+    let msg = err.message || 'Error desconocido durante la conversión.';
+    // Mensajes más claros para las causas más comunes de falla en el navegador
+    if (/memory|out of memory|allocat/i.test(msg)) {
+      msg = 'El navegador se quedó sin memoria procesando este video. Probá con el perfil Estándar 720p, cerrá otras pestañas, o usá un archivo más liviano — archivos cercanos a 3 GB pueden superar lo que WebAssembly puede direccionar.';
+    } else if (/abort/i.test(msg)) {
+      msg = 'El motor FFmpeg.wasm se detuvo inesperadamente. Recarga la página e inténtalo de nuevo (puede deberse a un archivo muy pesado para el navegador).';
+    }
+    showError(msg);
+    // Limpieza defensiva del FS por si quedó algo a medio escribir
+    safeUnlink('input.mp4');
+    safeUnlink('stream.m3u8');
+    safeUnlink('output.mp4');
+  } finally {
+    conversionInProgress = false;
+    setControlsEnabled(true);
+    resetButton();
+  }
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!lastResultBlob) return;
+  const url = URL.createObjectURL(lastResultBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = lastResultName || 'resultado';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+});
+
+function safeUnlink(name) {
+  try { ffmpeg.FS('unlink', name); } catch (_) { /* no existía, ignorar */ }
+}
+
+function setProgress(percent, message) {
+  progressBar.style.width = percent + '%';
+  progressPercent.textContent = percent + '%';
+  progressMessage.textContent = message;
+}
+
+function showError(msg) {
+  errorMessage.textContent = msg;
+  errorSection.classList.remove('hidden');
+  progressSection.classList.add('hidden');
+}
+
+function resetButton() {
+  convertBtn.disabled = false;
+  convertBtn.textContent = 'Convertir';
+}
+</script>
+</body>
+</html>

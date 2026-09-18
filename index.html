@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>PlutoPlay TV — Televisión Gratis en Vivo</title>
+<meta name="description" content="PlutoPlay TV: canales en vivo 24/7, películas, series, música y documentales gratis. Reproductor limpio sin marcas externas." />
+<meta name="theme-color" content="#0b0b10" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23f5730c'/%3E%3Ctext x='50' y='68' font-size='55' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E" />
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+<!-- Plyr.io Player -->
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+<script src="https://cdn.plyr.io/3.7.8/plyr.js" defer></script>
+
+<!-- hls.js for m3u8 external links -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" defer></script>
+
+<style>
+  :root{
+    --plyr-color-main:#f5730c;
+    --bg:#0b0b10;
+    --bg2:#131319;
+    --card:#1a1a22;
+    --accent:#f5730c;
+  }
+  *{scrollbar-width: thin; scrollbar-color: #444 #111;}
+  ::-webkit-scrollbar{height:8px;width:8px;}
+  ::-webkit-scrollbar-track{background:#111;}
+  ::-webkit-scrollbar-thumb{background:#444;border-radius:8px;}
+  body{background:var(--bg); font-family: 'Segoe UI', Roboto, Arial, sans-serif;}
+  .scrollbar-hide::-webkit-scrollbar{display:none;}
+  .scrollbar-hide{-ms-overflow-style:none; scrollbar-width:none;}
+  .channel-card{transition:transform .18s ease, box-shadow .18s ease;}
+  .channel-card:hover{transform:translateY(-4px) scale(1.04); box-shadow:0 10px 25px rgba(245,115,12,.25);}
+  .glass{background:rgba(19,19,25,.85); backdrop-filter: blur(10px);}
+  .nav-link.active{color:#fff; border-bottom:2px solid var(--accent);}
+
+  /* ---- Clean video player: hide ALL youtube branding, logos, subtitles, related overlays ---- */
+  #playerWrap{position:relative; background:#000; overflow:hidden;}
+  #playerWrap .plyr{width:100%; height:100%; --plyr-video-controls-background: linear-gradient(rgba(0,0,0,0) 0,rgba(0,0,0,.75) 100%);}
+  .plyr__video-embed, .plyr__video-embed iframe{
+    pointer-events:none !important; /* block any click-through to YouTube UI/related videos */
+  }
+  .plyr__video-embed{
+    transform: scale(1.24); /* crop out youtube logo / watermark corners */
+  }
+  .plyr__video-embed iframe{
+    top:-50%; height:200%;
+  }
+  .plyr__video-wrapper{overflow:hidden !important;}
+  /* hide captions button entirely (subtitles disabled by request) */
+  .plyr__control[data-plyr="captions"]{display:none !important;}
+  .plyr__captions{display:none !important;}
+  .yt-shield{position:absolute; inset:0; z-index:5; background:transparent;}
+
+  .live-dot{width:8px;height:8px;border-radius:50%;background:#ff3b30;box-shadow:0 0 8px #ff3b30; animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%{opacity:1;}50%{opacity:.35;}100%{opacity:1;}}
+  .modal-backdrop{background:rgba(0,0,0,.75); backdrop-filter: blur(4px);}
+  input[type="text"], input[type="url"], input[type="number"], select, textarea{outline:none;}
+  .toast{animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+  .chan-num-badge{font-variant-numeric: tabular-nums;}
+</style>
+</head>
+<body class="bg-[var(--bg)] text-gray-200 min-h-screen">
+
+<!-- ============================================================= -->
+<!-- HEADER -->
+<!-- ============================================================= -->
+<header class="sticky top-0 z-40 glass border-b border-white/10">
+  <div class="max-w-[1600px] mx-auto px-3 md:px-6 py-2.5 flex items-center gap-3">
+    <button id="btnMenuMobile" class="md:hidden text-white p-2 text-lg" onclick="App.showView('live')">☰</button>
+    <div class="flex items-center gap-2 cursor-pointer select-none" onclick="App.goHome()">
+      <div class="w-9 h-9 rounded-xl bg-[var(--accent)] flex items-center justify-center font-black text-white text-lg">P</div>
+      <span class="font-extrabold text-xl tracking-tight text-white">Pluto<span class="text-[var(--accent)]">Play</span> <span class="hidden sm:inline text-sm font-medium text-gray-400">TV</span></span>
+    </div>
+
+    <nav class="hidden md:flex items-center gap-5 ml-6 text-sm font-semibold text-gray-300">
+      <a class="nav-link active pb-1 cursor-pointer" data-view="home" onclick="App.showView('home')">Inicio</a>
+      <a class="nav-link pb-1 cursor-pointer" data-view="live" onclick="App.showView('live')">En Vivo</a>
+      <a class="nav-link pb-1 cursor-pointer" data-view="guide" onclick="App.showView('guide')">Guía</a>
+      <a class="nav-link pb-1 cursor-pointer" data-view="favorites" onclick="App.showView('favorites')">Favoritos</a>
+    </nav>
+
+    <div class="flex-1 flex justify-center px-2">
+      <div class="relative w-full max-w-md">
+        <input id="searchInput" type="text" placeholder="Buscar canales, películas, música..."
+          class="w-full bg-white/5 border border-white/10 rounded-full py-2 pl-9 pr-3 text-sm text-white placeholder-gray-500 focus:border-[var(--accent)] transition" />
+        <span class="absolute left-3 top-2.5 text-gray-500 text-sm">🔎</span>
+      </div>
+    </div>
+
+    <button id="btnInstall" class="hidden sm:flex items-center gap-1 bg-white/10 hover:bg-white/20 text-white text-xs font-bold px-3 py-2 rounded-full">⬇️ Instalar</button>
+    <button onclick="App.openAddChannel()" class="flex items-center gap-1 bg-[var(--accent)] hover:brightness-110 text-white text-xs font-bold px-3 py-2 rounded-full">+ Canal</button>
+  </div>
+  <div class="md:hidden flex overflow-x-auto scrollbar-hide gap-4 px-4 pb-2 text-sm font-semibold text-gray-300">
+    <a class="nav-link active pb-1 whitespace-nowrap" data-view="home" onclick="App.showView('home')">Inicio</a>
+    <a class="nav-link pb-1 whitespace-nowrap" data-view="live" onclick="App.showView('live')">En Vivo</a>
+    <a class="nav-link pb-1 whitespace-nowrap" data-view="guide" onclick="App.showView('guide')">Guía</a>
+    <a class="nav-link pb-1 whitespace-nowrap" data-view="favorites" onclick="App.showView('favorites')">Favoritos</a>
+  </div>
+</header>
+
+<!-- ============================================================= -->
+<!-- PLAYER (fixed panel that opens on channel select) -->
+<!-- ============================================================= -->
+<section id="playerSection" class="hidden">
+  <div class="max-w-[1600px] mx-auto px-0 md:px-6 pt-0 md:pt-4">
+    <div id="playerWrap" class="w-full aspect-video md:rounded-xl relative">
+      <video id="ytPlayer" playsinline controls></video>
+      <div class="yt-shield" id="ytShield"></div>
+
+      <!-- Channel switch arrows -->
+      <button onclick="App.changeChannel(-1)" class="hidden md:flex items-center justify-center absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white text-xl">‹</button>
+      <button onclick="App.changeChannel(1)" class="hidden md:flex items-center justify-center absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 text-white text-xl">›</button>
+
+      <!-- Channel number overlay -->
+      <div id="channelBadge" class="absolute top-3 left-3 z-20 flex items-center gap-2 bg-black/60 rounded-lg px-3 py-1.5">
+        <span class="live-dot"></span>
+        <span class="text-white font-black chan-num-badge" id="badgeNum">--</span>
+        <span class="text-gray-200 text-sm font-semibold" id="badgeName">Canal</span>
+      </div>
+      <button onclick="App.closePlayer()" class="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-black/60 hover:bg-black/85 text-white flex items-center justify-center">✕</button>
+    </div>
+
+    <!-- Now / Next bar -->
+    <div class="bg-[var(--bg2)] md:rounded-b-xl px-4 py-3 flex flex-col md:flex-row md:items-center gap-2 justify-between">
+      <div>
+        <p class="text-xs uppercase tracking-wide text-[var(--accent)] font-bold">Ahora</p>
+        <p class="text-white font-semibold" id="nowTitle">—</p>
+      </div>
+      <div class="flex-1 mx-4 hidden md:block">
+        <div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div id="progressBar" class="h-full bg-[var(--accent)]" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="text-xs uppercase tracking-wide text-gray-400 font-bold">Siguiente</p>
+        <p class="text-gray-300 font-medium" id="nextTitle">—</p>
+      </div>
+      <div class="flex items-center gap-2 ml-0 md:ml-4">
+        <button onclick="App.toggleFavoriteCurrent()" id="favBtn" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">☆</button>
+        <button onclick="App.showView('guide')" class="px-3 h-9 rounded-full bg-white/10 hover:bg-white/20 text-sm font-semibold">Guía</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<!-- MAIN CONTENT -->
+<!-- ============================================================= -->
+<main class="max-w-[1600px] mx-auto px-3 md:px-6 py-6">
+
+  <!-- HOME VIEW -->
+  <div id="view-home">
+    <div id="heroBanner" class="w-full rounded-2xl overflow-hidden relative h-56 md:h-80 mb-8 bg-gradient-to-br from-[#2a1a3a] via-[#1a1a2e] to-black flex items-center">
+      <div class="p-6 md:p-12 max-w-xl">
+        <p class="text-[var(--accent)] font-bold text-sm mb-2 uppercase tracking-widest">Canal destacado</p>
+        <h1 class="text-2xl md:text-4xl font-black text-white mb-3">Televisión gratis, sin cortes ni marcas de agua</h1>
+        <p class="text-gray-300 mb-4 text-sm md:text-base">Cientos de horas de películas, música y documentales listos para ver ahora mismo.</p>
+        <button onclick="App.playFeatured()" class="bg-[var(--accent)] hover:brightness-110 text-white font-bold px-5 py-2.5 rounded-full">▶ Reproducir ahora</button>
+      </div>
+    </div>
+    <div id="categoryRows"></div>
+  </div>
+
+  <!-- LIVE (grid) VIEW -->
+  <div id="view-live" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold text-white">Todos los canales</h2>
+      <div id="categoryTabs" class="flex gap-2 overflow-x-auto scrollbar-hide"></div>
+    </div>
+    <div id="liveGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+  </div>
+
+  <!-- GUIDE VIEW -->
+  <div id="view-guide" class="hidden">
+    <h2 class="text-xl font-bold text-white mb-4">Guía de programación</h2>
+    <div id="guideList" class="space-y-2"></div>
+  </div>
+
+  <!-- FAVORITES VIEW -->
+  <div id="view-favorites" class="hidden">
+    <h2 class="text-xl font-bold text-white mb-4">Mis canales favoritos</h2>
+    <div id="favGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
+    <p id="favEmpty" class="hidden text-gray-500">Aún no tienes canales favoritos. Toca la ⭐ en cualquier canal para agregarlo.</p>
+  </div>
+
+</main>
+
+<footer class="border-t border-white/10 py-8 mt-10 text-center text-gray-500 text-xs">
+  <p>PlutoPlay TV — Demo educativa de streaming tipo Pluto TV. Reproductor propulsado por <a href="https://plyr.io" target="_blank" class="text-[var(--accent)]">Plyr.io</a>.</p>
+  <p class="mt-1">Agrega tus propios canales con enlaces de YouTube, MP4 o HLS (m3u8) usando el botón "+ Canal".</p>
+</footer>
+
+<!-- ============================================================= -->
+<!-- MODAL: Add / Edit Channel -->
+<!-- ============================================================= -->
+<div id="modalAddChannel" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="bg-[var(--bg2)] w-full max-w-lg rounded-2xl p-6 border border-white/10 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-white">Agregar / Editar canal</h3>
+      <button onclick="App.closeAddChannel()" class="text-gray-400 hover:text-white text-xl">✕</button>
+    </div>
+    <form id="formAddChannel" class="space-y-3" onsubmit="return App.submitChannel(event)">
+      <input type="hidden" id="editChannelId" />
+      <div>
+        <label class="text-xs text-gray-400 font-semibold">Nombre del canal *</label>
+        <input required id="fName" type="text" placeholder="Ej: Mi Canal de Películas" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs text-gray-400 font-semibold">Categoría</label>
+          <input id="fCategory" type="text" placeholder="Películas, Música..." class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 font-semibold">Logo emoji / letra</label>
+          <input id="fLogo" type="text" maxlength="4" placeholder="🎬" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white" />
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-gray-400 font-semibold">Enlaces del canal (uno por línea) *</label>
+        <textarea required id="fLinks" rows="4" placeholder="ID o URL de YouTube&#10;https://.../video.mp4&#10;https://.../playlist.m3u8" class="w-full mt-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-xs"></textarea>
+        <p class="text-[10px] text-gray-500 mt-1">Acepta: ID de YouTube (ej: dQw4w9WgXcQ), URL completa de YouTube, enlaces .mp4, .webm o .m3u8 (HLS), o Vimeo.</p>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="flex-1 bg-[var(--accent)] hover:brightness-110 text-white font-bold py-2.5 rounded-lg">Guardar canal</button>
+        <button type="button" id="btnDeleteChannel" onclick="App.deleteEditingChannel()" class="hidden px-4 bg-red-600/80 hover:bg-red-600 text-white font-bold py-2.5 rounded-lg">Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toastBox" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 items-end"></div>
+
+<!-- ============================================================= -->
+<!-- APP.JS  (embedded main application logic) -->
+<!-- ============================================================= -->
+<script id="app-js">
+/* global Plyr, Hls */
+(function(){
+"use strict";
+
+/* ---------- Sample "channel lineup" (all sources are freely embeddable demo content) ---------- */
+const DURATIONS = { // approx seconds, used to simulate a real always-on live channel
+  "aqz-KE-bpKQ": 634, "eRsGyueVLvQ": 888, "R6MlUcmOul8": 734,
+  "Man4Xw8Xypo": 731, "TLkA0RELQ1g": 653
+};
+
+function yt(id, title){ return { type:"youtube", src:id, title, duration: DURATIONS[id] || 0 }; }
+
+const DEFAULT_CHANNELS = [
+  { id:"c1", number:1, name:"CINE PLUS", category:"Películas", logo:"🎬",
+    items:[ yt("aqz-KE-bpKQ","Big Buck Bunny"), yt("eRsGyueVLvQ","Sintel") ] },
+  { id:"c2", number:2, name:"CINE ACCIÓN", category:"Películas", logo:"🎥",
+    items:[ yt("R6MlUcmOul8","Tears of Steel"), yt("Man4Xw8Xypo","Cosmos Laundromat") ] },
+  { id:"c3", number:3, name:"ANIMACIÓN KIDS", category:"Niños", logo:"🧸",
+    items:[ yt("TLkA0RELQ1g","Elephants Dream"), yt("aqz-KE-bpKQ","Big Buck Bunny") ] },
+  { id:"c4", number:4, name:"LOFI RADIO", category:"Música", logo:"🎧",
+    items:[ yt("jfKfPfyJRdk","Lofi Radio 24/7"), yt("5qap5aO4i9A","Beats para Relajar") ] },
+  { id:"c5", number:5, name:"DOCUMENTALES HD", category:"Documentales", logo:"🌍",
+    items:[ yt("Man4Xw8Xypo","Cosmos Laundromat"), yt("eRsGyueVLvQ","Sintel") ] },
+  { id:"c6", number:6, name:"RETRO CLASSICS", category:"Clásicos", logo:"📼",
+    items:[ yt("TLkA0RELQ1g","Elephants Dream"), yt("R6MlUcmOul8","Tears of Steel") ] },
+  { id:"c7", number:7, name:"DEMO HLS LIVE", category:"En Vivo", logo:"📡",
+    items:[ { type:"hls", src:"https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", title:"Transmisión HLS de prueba", duration:0 } ] },
+  { id:"c8", number:8, name:"DEMO MP4", category:"En Vivo", logo:"🎞️",
+    items:[ { type:"video", src:"https://www.w3schools.com/html/mov_bbb.mp4", title:"Video MP4 de prueba", duration:0 } ] }
+];
+
+const EPOCH = Date.UTC(2024,0,1)/1000; // fixed reference so "live" channels stay in sync across visits
+
+/* ---------- State ---------- */
+const State = {
+  channels: [],
+  currentIndex: -1,
+  currentItemIndex: 0,
+  player: null,
+  hls: null,
+  favorites: new Set(JSON.parse(localStorage.getItem("pp_favorites")||"[]")),
+  view: "home",
+  category: "Todos",
+  numBuffer: "",
+  numTimer: null
+};
+
+function loadChannels(){
+  const custom = JSON.parse(localStorage.getItem("pp_custom_channels")||"[]");
+  State.channels = [...DEFAULT_CHANNELS, ...custom].map((c,i)=>({...c, number: c.number || (i+1)}));
+}
+function saveCustomChannels(){
+  const custom = State.channels.filter(c=>c.custom);
+  localStorage.setItem("pp_custom_channels", JSON.stringify(custom));
+}
+function saveFavorites(){
+  localStorage.setItem("pp_favorites", JSON.stringify([...State.favorites]));
+}
+
+/* ---------- Helpers: parse external links (YouTube / Vimeo / mp4 / m3u8) ---------- */
+function parseLink(raw){
+  raw = raw.trim();
+  if(!raw) return null;
+  // YouTube full URL
+  let m = raw.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{11})/);
+  if(m) return { type:"youtube", src:m[1], title:"", duration:0 };
+  // Vimeo
+  m = raw.match(/vimeo\.com\/(\d+)/);
+  if(m) return { type:"vimeo", src:m[1], title:"", duration:0 };
+  // Direct video files
+  if(/\.m3u8($|\?)/i.test(raw)) return { type:"hls", src:raw, title:"", duration:0 };
+  if(/\.(mp4|webm|ogg)($|\?)/i.test(raw)) return { type:"video", src:raw, title:"", duration:0 };
+  // Bare 11-char YouTube ID
+  if(/^[A-Za-z0-9_-]{11}$/.test(raw)) return { type:"youtube", src:raw, title:"", duration:0 };
+  // Fallback: treat as generic embeddable URL
+  return { type:"iframe", src:raw, title:"", duration:0 };
+}
+
+/* ---------- Player ---------- */
+function initPlyr(){
+  State.player = new Plyr("#ytPlayer", {
+    controls: ["play-large","play","progress","current-time","mute","volume","pip","fullscreen"],
+    settings: ["quality","speed"],
+    youtube: { noCookie:true, rel:0, showinfo:0, iv_load_policy:3, modestbranding:1, disablekb:1, cc_load_policy:0, fs:0, playsinline:1 },
+    vimeo: { byline:false, portrait:false, title:false, transparent:false },
+    autoplay: true,
+    clickToPlay: true,
+    keyboard: { focused:true, global:false },
+    captions: { active:false }
+  });
+  State.player.on("ended", onItemEnded);
+  State.player.on("playing", ()=>{ document.getElementById("channelBadge").style.opacity=1; });
+  setInterval(updateProgressUI, 1000);
+}
+
+function destroyHls(){
+  if(State.hls){ try{ State.hls.destroy(); }catch(e){} State.hls=null; }
+}
+
+function playCurrentItem(seekSeconds){
+  const ch = State.channels[State.currentIndex];
+  if(!ch) return;
+  const item = ch.items[State.currentItemIndex];
+  destroyHls();
+  const videoEl = document.getElementById("ytPlayer");
+
+  if(item.type === "youtube"){
+    State.player.source = { type:"video", title:item.title||ch.name, sources:[{ src:item.src, provider:"youtube" }] };
+  } else if(item.type === "vimeo"){
+    State.player.source = { type:"video", title:item.title||ch.name, sources:[{ src:item.src, provider:"vimeo" }] };
+  } else if(item.type === "hls"){
+    if(window.Hls && Hls.isSupported()){
+      State.player.source = { type:"video", title:item.title||ch.name, sources:[{ src:item.src, type:"application/x-mpegURL" }] };
+      // Plyr html5 provider will call video element; attach hls.js manually for browsers w/o native HLS
+      setTimeout(()=>{
+        try{
+          destroyHls();
+          State.hls = new Hls();
+          State.hls.loadSource(item.src);
+          State.hls.attachMedia(videoEl);
+        }catch(e){ console.warn(e); }
+      }, 50);
+    } else {
+      State.player.source = { type:"video", title:item.title||ch.name, sources:[{ src:item.src, type:"application/x-mpegURL" }] };
+    }
+  } else if(item.type === "video"){
+    State.player.source = { type:"video", title:item.title||ch.name, sources:[{ src:item.src, type:"video/mp4" }] };
+  } else {
+    // generic iframe fallback (no Plyr controls, raw embed)
+    showRawEmbed(item.src);
+    return;
+  }
+  hideRawEmbed();
+  State.player.once("ready", ()=>{
+    if(seekSeconds && seekSeconds>0){ try{ State.player.currentTime = seekSeconds; }catch(e){} }
+    State.player.play().catch(()=>{});
+  });
+  updateNowNext();
+}
+
+function showRawEmbed(url){
+  let box = document.getElementById("rawEmbedBox");
+  const wrap = document.getElementById("playerWrap");
+  if(!box){
+    box = document.createElement("iframe");
+    box.id = "rawEmbedBox";
+    box.className = "absolute inset-0 w-full h-full z-10 border-0";
+    box.allow = "autoplay; fullscreen; encrypted-media; picture-in-picture";
+    wrap.appendChild(box);
+  }
+  box.src = url;
+  box.style.display = "block";
+  document.getElementById("ytPlayer").style.display = "none";
+}
+function hideRawEmbed(){
+  const box = document.getElementById("rawEmbedBox");
+  if(box){ box.src=""; box.style.display="none"; }
+  document.getElementById("ytPlayer").style.display = "";
+}
+
+function onItemEnded(){
+  const ch = State.channels[State.currentIndex];
+  if(!ch) return;
+  State.currentItemIndex = (State.currentItemIndex + 1) % ch.items.length;
+  playCurrentItem(0);
+}
+
+function computeLiveState(ch){
+  const allTimed = ch.items.length>0 && ch.items.every(it=>it.duration>0);
+  if(!allTimed) return { index:0, offset:0 };
+  const total = ch.items.reduce((s,it)=>s+it.duration,0);
+  let elapsed = (Math.floor(Date.now()/1000) - EPOCH) % total;
+  if(elapsed<0) elapsed += total;
+  let idx=0;
+  for(let i=0;i<ch.items.length;i++){
+    if(elapsed < ch.items[i].duration){ idx=i; break; }
+    elapsed -= ch.items[i].duration;
+    idx = i+1 < ch.items.length ? i+1 : 0;
+  }
+  return { index: idx, offset: elapsed };
+}
+
+function updateProgressUI(){
+  const ch = State.channels[State.currentIndex];
+  if(!ch) return;
+  const item = ch.items[State.currentItemIndex];
+  if(item && item.duration>0 && State.player && State.player.currentTime!=null){
+    const pct = Math.min(100, (State.player.currentTime / item.duration) * 100);
+    document.getElementById("progressBar").style.width = pct+"%";
+  }
+}
+
+/* ---------- Channel navigation / loading ---------- */
+function loadChannel(index, fromUserClick){
+  if(index<0) index = State.channels.length-1;
+  if(index>=State.channels.length) index = 0;
+  State.currentIndex = index;
+  const ch = State.channels[index];
+  const live = computeLiveState(ch);
+  State.currentItemIndex = live.index;
+
+  document.getElementById("playerSection").classList.remove("hidden");
+  document.getElementById("badgeNum").textContent = ch.number;
+  document.getElementById("badgeName").textContent = ch.name;
+  document.getElementById("favBtn").textContent = State.favorites.has(ch.id) ? "★" : "☆";
+
+  playCurrentItem(live.offset);
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function updateNowNext(){
+  const ch = State.channels[State.currentIndex];
+  if(!ch) return;
+  const cur = ch.items[State.currentItemIndex];
+  const next = ch.items[(State.currentItemIndex+1)%ch.items.length];
+  document.getElementById("nowTitle").textContent = cur.title || ch.name;
+  document.getElementById("nextTitle").textContent = next.title || ch.name;
+}
+
+/* ---------- Rendering ---------- */
+function channelCardHTML(ch){
+  const isFav = State.favorites.has(ch.id);
+  return `
+  <div class="channel-card cursor-pointer bg-[var(--card)] rounded-xl overflow-hidden border border-white/5" onclick="App.openChannel('${ch.id}')">
+    <div class="h-24 flex items-center justify-center text-4xl bg-gradient-to-br from-white/5 to-transparent relative">
+      ${ch.logo || "📺"}
+      <span class="absolute top-1.5 left-1.5 bg-black/60 text-[10px] font-bold text-white px-1.5 py-0.5 rounded">CH ${ch.number}</span>
+      <button onclick="event.stopPropagation(); App.toggleFavorite('${ch.id}')" class="absolute top-1.5 right-1.5 text-sm">${isFav?"⭐":"☆"}</button>
+    </div>
+    <div class="p-2.5">
+      <p class="text-white text-sm font-bold truncate">${ch.name}</p>
+      <p class="text-gray-500 text-xs truncate">${ch.category}</p>
+    </div>
+  </div>`;
+}
+
+function renderCategoryRows(){
+  const cats = [...new Set(State.channels.map(c=>c.category))];
+  const box = document.getElementById("categoryRows");
+  box.innerHTML = cats.map(cat=>{
+    const chans = State.channels.filter(c=>c.category===cat);
+    return `<div class="mb-8">
+      <h3 class="text-white font-bold text-lg mb-3">${cat}</h3>
+      <div class="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+        ${chans.map(c=>`<div class="min-w-[140px] max-w-[140px]">${channelCardHTML(c)}</div>`).join("")}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderLiveGrid(){
+  const tabs = document.getElementById("categoryTabs");
+  const cats = ["Todos", ...new Set(State.channels.map(c=>c.category))];
+  tabs.innerHTML = cats.map(cat=>`<button onclick="App.setCategory('${cat}')" class="px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${State.category===cat?'bg-[var(--accent)] text-white':'bg-white/10 text-gray-300'}">${cat}</button>`).join("");
+
+  const grid = document.getElementById("liveGrid");
+  const list = State.category==="Todos" ? State.channels : State.channels.filter(c=>c.category===State.category);
+  grid.innerHTML = list.map(channelCardHTML).join("") || `<p class="text-gray-500 col-span-full">No hay canales en esta categoría.</p>`;
+}
+
+function renderGuide(){
+  const box = document.getElementById("guideList");
+  box.innerHTML = State.channels.map(ch=>{
+    const live = computeLiveState(ch);
+    const cur = ch.items[live.index];
+    const next = ch.items[(live.index+1)%ch.items.length];
+    const pct = cur.duration>0 ? Math.min(100,(live.offset/cur.duration)*100) : 0;
+    return `<div class="flex items-center gap-4 bg-[var(--card)] rounded-xl p-3 cursor-pointer hover:bg-white/5" onclick="App.openChannel('${ch.id}')">
+      <div class="w-14 h-14 rounded-lg bg-black/30 flex items-center justify-center text-2xl shrink-0">${ch.logo||"📺"}</div>
+      <div class="w-14 text-center shrink-0">
+        <p class="text-[10px] text-gray-500 font-bold">CANAL</p>
+        <p class="text-white font-black text-lg leading-none">${ch.number}</p>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-white font-bold truncate">${ch.name}</p>
+        <p class="text-gray-400 text-xs truncate">Ahora: ${cur.title||ch.name}</p>
+        <div class="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden"><div class="h-full bg-[var(--accent)]" style="width:${pct}%"></div></div>
+      </div>
+      <div class="hidden sm:block text-right shrink-0 max-w-[150px]">
+        <p class="text-[10px] text-gray-500 font-bold">SIGUIENTE</p>
+        <p class="text-gray-300 text-xs truncate">${next.title||ch.name}</p>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function renderFavorites(){
+  const grid = document.getElementById("favGrid");
+  const list = State.channels.filter(c=>State.favorites.has(c.id));
+  grid.innerHTML = list.map(channelCardHTML).join("");
+  document.getElementById("favEmpty").classList.toggle("hidden", list.length>0);
+}
+
+function renderAll(){
+  renderCategoryRows();
+  renderLiveGrid();
+  renderGuide();
+  renderFavorites();
+}
+
+/* ---------- Search ---------- */
+document.getElementById("searchInput").addEventListener("input", (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  if(!q){ renderAll(); return; }
+  const filtered = State.channels.filter(c=>c.name.toLowerCase().includes(q)||c.category.toLowerCase().includes(q));
+  document.getElementById("liveGrid").innerHTML = filtered.map(channelCardHTML).join("") || `<p class="text-gray-500 col-span-full">Sin resultados para "${q}".</p>`;
+  App.showView("live");
+});
+
+/* ---------- Toasts ---------- */
+function toast(msg){
+  const box = document.getElementById("toastBox");
+  const el = document.createElement("div");
+  el.className = "toast bg-[var(--card)] border border-white/10 text-white text-sm px-4 py-2.5 rounded-lg shadow-xl";
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(()=>el.remove(), 2800);
+}
+
+/* ---------- Public API ---------- */
+window.App = {
+  showView(v){
+    State.view = v;
+    ["home","live","guide","favorites"].forEach(name=>{
+      document.getElementById("view-"+name).classList.toggle("hidden", name!==v);
+    });
+    document.querySelectorAll(".nav-link").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
+    if(v==="guide") renderGuide();
+    if(v==="favorites") renderFavorites();
+    if(v==="live") renderLiveGrid();
+  },
+  goHome(){ this.showView("home"); },
+  setCategory(cat){ State.category = cat; renderLiveGrid(); },
+  openChannel(id){
+    const idx = State.channels.findIndex(c=>c.id===id);
+    if(idx>-1) loadChannel(idx, true);
+  },
+  changeChannel(dir){
+    if(State.currentIndex<0) return;
+    loadChannel(State.currentIndex+dir);
+  },
+  closePlayer(){
+    document.getElementById("playerSection").classList.add("hidden");
+    try{ State.player.stop(); }catch(e){}
+    destroyHls();
+  },
+  toggleFavorite(id){
+    if(State.favorites.has(id)) State.favorites.delete(id); else State.favorites.add(id);
+    saveFavorites(); renderAll();
+    if(State.currentIndex>-1 && State.channels[State.currentIndex].id===id){
+      document.getElementById("favBtn").textContent = State.favorites.has(id) ? "★" : "☆";
+    }
+  },
+  toggleFavoriteCurrent(){
+    const ch = State.channels[State.currentIndex];
+    if(ch) this.toggleFavorite(ch.id);
+  },
+  playFeatured(){ this.openChannel("c1"); },
+  openAddChannel(){
+    document.getElementById("formAddChannel").reset();
+    document.getElementById("editChannelId").value = "";
+    document.getElementById("btnDeleteChannel").classList.add("hidden");
+    document.getElementById("modalAddChannel").classList.remove("hidden");
+  },
+  closeAddChannel(){ document.getElementById("modalAddChannel").classList.add("hidden"); },
+  editChannel(id){
+    const ch = State.channels.find(c=>c.id===id);
+    if(!ch) return;
+    document.getElementById("editChannelId").value = ch.id;
+    document.getElementById("fName").value = ch.name;
+    document.getElementById("fCategory").value = ch.category;
+    document.getElementById("fLogo").value = ch.logo;
+    document.getElementById("fLinks").value = ch.items.map(it=>it.src).join("\n");
+    document.getElementById("btnDeleteChannel").classList.toggle("hidden", !ch.custom);
+    document.getElementById("modalAddChannel").classList.remove("hidden");
+  },
+  submitChannel(e){
+    e.preventDefault();
+    const editId = document.getElementById("editChannelId").value;
+    const name = document.getElementById("fName").value.trim();
+    const category = document.getElementById("fCategory").value.trim() || "General";
+    const logo = document.getElementById("fLogo").value.trim() || "📺";
+    const linksRaw = document.getElementById("fLinks").value.split("\n").map(s=>s.trim()).filter(Boolean);
+    const items = linksRaw.map(parseLink).filter(Boolean);
+    if(items.length===0){ toast("Agrega al menos un enlace o ID válido."); return false; }
+
+    if(editId){
+      const ch = State.channels.find(c=>c.id===editId);
+      if(ch){ ch.name=name; ch.category=category; ch.logo=logo; ch.items=items; }
+    } else {
+      const newCh = { id:"custom-"+Date.now(), number: State.channels.length+1, name, category, logo, items, custom:true };
+      State.channels.push(newCh);
+    }
+    saveCustomChannels();
+    renderAll();
+    this.closeAddChannel();
+    toast("Canal guardado correctamente ✅");
+    return false;
+  },
+  deleteEditingChannel(){
+    const editId = document.getElementById("editChannelId").value;
+    State.channels = State.channels.filter(c=>c.id!==editId);
+    saveCustomChannels();
+    renderAll();
+    this.closeAddChannel();
+    toast("Canal eliminado.");
+  }
+};
+
+/* ---------- Keyboard: channel surfing like a real remote ---------- */
+document.addEventListener("keydown", (e)=>{
+  if(document.getElementById("playerSection").classList.contains("hidden")) return;
+  if(["INPUT","TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if(e.key==="ArrowUp"){ App.changeChannel(1); }
+  if(e.key==="ArrowDown"){ App.changeChannel(-1); }
+  if(e.key==="Escape"){ App.closePlayer(); }
+  if(/^[0-9]$/.test(e.key)){
+    State.numBuffer += e.key;
+    clearTimeout(State.numTimer);
+    State.numTimer = setTimeout(()=>{
+      const n = parseInt(State.numBuffer,10);
+      const idx = State.channels.findIndex(c=>c.number===n);
+      if(idx>-1) loadChannel(idx);
+      State.numBuffer = "";
+    }, 800);
+  }
+});
+
+/* ---------- Long-press / double-click card to edit custom channels ---------- */
+document.addEventListener("dblclick", (e)=>{
+  const card = e.target.closest(".channel-card");
+  if(!card) return;
+});
+
+/* ---------- Init ---------- */
+function init(){
+  loadChannels();
+  renderAll();
+  document.addEventListener("plyr-ready", initPlyr);
+  // Plyr loads via defer script; wait for it
+  const waitPlyr = setInterval(()=>{
+    if(window.Plyr){ clearInterval(waitPlyr); initPlyr(); }
+  }, 50);
+}
+init();
+
+})();
+</script>
+
+<!-- ============================================================= -->
+<!-- MANIFEST.JSON (embedded, converted to a Blob at runtime) -->
+<!-- ============================================================= -->
+<script type="application/json" id="manifest-json">
+{
+  "name": "PlutoPlay TV",
+  "short_name": "PlutoPlay",
+  "description": "Televisión en vivo gratuita: películas, música, documentales y canales personalizados.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0b10",
+  "theme_color": "#0b0b10",
+  "icons": [
+    { "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='36' fill='%23f5730c'/%3E%3Ctext x='96' y='135' font-size='110' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23f5730c'/%3E%3Ctext x='256' y='360' font-size='300' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
+</script>
+
+<!-- ============================================================= -->
+<!-- SERVICE WORKER SOURCE (embedded, registered via Blob URL) -->
+<!-- ============================================================= -->
+<script type="text/plain" id="sw-source">
+const CACHE_NAME = "plutoplay-cache-v1";
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return fetch(self.registration.scope).then((res) => cache.put(self.registration.scope, res)).catch(()=>{});
+    })
+  );
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+  );
+  self.clients.claim();
+});
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  event.respondWith(
+    caches.match(req).then((cached) => {
+      const network = fetch(req).then((res) => {
+        if (res && res.status === 200) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone)).catch(()=>{});
+        }
+        return res;
+      }).catch(() => cached);
+      return cached || network;
+    })
+  );
+});
+</script>
+
+<!-- ============================================================= -->
+<!-- BOOTSTRAP: build manifest + service worker from embedded blobs, PWA install -->
+<!-- ============================================================= -->
+<script>
+(function(){
+  // 1) Build manifest.json as a Blob and attach it
+  try{
+    const manifestText = document.getElementById("manifest-json").textContent;
+    const manifestBlob = new Blob([manifestText], { type: "application/manifest+json" });
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    const link = document.createElement("link");
+    link.rel = "manifest";
+    link.href = manifestURL;
+    document.head.appendChild(link);
+  }catch(e){ console.warn("Manifest embed failed", e); }
+
+  // 2) Register service-worker.js built from embedded source, via Blob URL
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      try{
+        const swSource = document.getElementById("sw-source").textContent;
+        const swBlob = new Blob([swSource], { type: "text/javascript" });
+        const swURL = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swURL, { scope: "./" }).catch((err)=>{
+          console.warn("SW registration skipped:", err && err.message);
+        });
+      }catch(e){ console.warn("SW embed failed", e); }
+    });
+  }
+
+  // 3) PWA install prompt
+  let deferredPrompt = null;
+  const btnInstall = document.getElementById("btnInstall");
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    btnInstall.classList.remove("hidden");
+  });
+  btnInstall.addEventListener("click", async () => {
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    btnInstall.classList.add("hidden");
+  });
+
+  // NOTE: intentionally NO frame-busting / top.location code here,
+  // so this page can be freely previewed & edited inside iframes (Claude, editors, etc.)
+})();
+</script>
+
+</body>
+</html>

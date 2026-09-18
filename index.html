@@ -80,7 +80,7 @@
     </div>
     <h1 class="font-toon comic-outline text-4xl sm:text-5xl font-800 text-white drop-shadow-lg">Doodle World Lens</h1>
     <p class="max-w-md text-sm sm:text-base text-white/90 font-medium leading-relaxed">
-      Convierte lo que graba tu cámara en una <b>caricatura animada real</b>, con colores vivos y estables, líneas de cómic y cero distorsión. Funciona con cámara delantera y trasera, en móviles y tablets.
+      Convierte lo que graba tu cámara en una <b>caricatura animada real</b>: colores puros y planos, líneas de tinta gruesas y estables, cero distorsión. Calidad, enfoque y color se ajustan <b>100% automático a nivel profesional</b>. Funciona con cámara delantera y trasera, en móviles y tablets.
     </p>
     <button id="startBtn" class="toon-btn font-toon text-lg sm:text-xl bg-amber-400 hover:bg-amber-300 text-indigo-900 font-bold py-4 px-10 rounded-full border-4 border-white/70">
       ▶ Activar cámara y comenzar
@@ -148,24 +148,42 @@
       </div>
 
       <div class="space-y-5 text-sm">
+
+        <div>
+          <p class="mb-2 text-white/80">✨ Estilos de caricatura profesional (1 toque)</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button data-preset="clasico" class="preset-btn toon-btn bg-gradient-to-br from-pink-500 to-fuchsia-600 rounded-xl py-2 px-1 text-xs font-bold">🎬 Clásico</button>
+            <button data-preset="vivido" class="preset-btn toon-btn bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl py-2 px-1 text-xs font-bold text-indigo-950">🌈 Vívido</button>
+            <button data-preset="comic" class="preset-btn toon-btn bg-gradient-to-br from-sky-400 to-indigo-600 rounded-xl py-2 px-1 text-xs font-bold">✒️ Cómic</button>
+          </div>
+        </div>
+
         <div>
           <label class="flex justify-between mb-1"><span>🎨 Niveles de color (posterizado)</span><span id="valLevels" class="font-mono"></span></label>
           <input id="levels" type="range" min="3" max="10" step="1" class="w-full">
         </div>
         <div>
-          <label class="flex justify-between mb-1"><span>✏️ Grosor de líneas de cómic</span><span id="valEdgeStrength" class="font-mono"></span></label>
+          <label class="flex justify-between mb-1"><span>🧽 Planitud de color (pureza cartoon)</span><span id="valFlatness" class="font-mono"></span></label>
+          <input id="flatness" type="range" min="0" max="1" step="0.01" class="w-full">
+        </div>
+        <div>
+          <label class="flex justify-between mb-1"><span>✏️ Intensidad de líneas de tinta</span><span id="valEdgeStrength" class="font-mono"></span></label>
           <input id="edgeStrength" type="range" min="0" max="1" step="0.01" class="w-full">
+        </div>
+        <div>
+          <label class="flex justify-between mb-1"><span>📏 Grosor de la línea (dilatación)</span><span id="valLineThickness" class="font-mono"></span></label>
+          <input id="lineThickness" type="range" min="1" max="3" step="0.1" class="w-full">
         </div>
         <div>
           <label class="flex justify-between mb-1"><span>🔍 Detalle de trazos</span><span id="valEdgeThreshold" class="font-mono"></span></label>
           <input id="edgeThreshold" type="range" min="0.05" max="0.6" step="0.01" class="w-full">
         </div>
         <div>
-          <label class="flex justify-between mb-1"><span>🌈 Saturación de colores</span><span id="valSaturation" class="font-mono"></span></label>
-          <input id="saturation" type="range" min="0.5" max="2.5" step="0.01" class="w-full">
+          <label class="flex justify-between mb-1"><span>🌈 Viveza de color (vibrance natural)</span><span id="valSaturation" class="font-mono"></span></label>
+          <input id="saturation" type="range" min="0.5" max="3" step="0.01" class="w-full">
         </div>
         <div>
-          <label class="flex justify-between mb-1"><span>🧊 Estabilidad de imagen</span><span id="valSmooth" class="font-mono"></span></label>
+          <label class="flex justify-between mb-1"><span>🧊 Estabilidad de imagen (anti-parpadeo)</span><span id="valSmooth" class="font-mono"></span></label>
           <input id="smooth" type="range" min="0" max="0.9" step="0.01" class="w-full">
         </div>
         <div>
@@ -185,8 +203,9 @@
         <div class="flex items-center justify-between pt-1">
           <span>⚡ Calidad de procesamiento</span>
           <select id="quality" class="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+            <option value="auto" selected>Automática (recomendada)</option>
             <option value="low">Ahorro (más fluido)</option>
-            <option value="medium" selected>Media</option>
+            <option value="medium">Media</option>
             <option value="high">Alta (más nítido)</option>
           </select>
         </div>
@@ -340,12 +359,21 @@
      2. Estado / configuración del efecto
      ============================================================ */
   const cfg = {
-    levels: 6, edgeStrength: 0.85, edgeThreshold: 0.22,
-    saturation: 1.5, smooth: 0.55, brightness: 0.02, contrast: 1.1,
-    quality: 'medium', mic: true
+    levels: 5, edgeStrength: 0.95, edgeThreshold: 0.2,
+    saturation: 1.7, smooth: 0.5, brightness: 0.02, contrast: 1.18,
+    flatness: 0.62, lineThickness: 1.5,
+    quality: 'auto', mic: true
   };
   const DEFAULTS = Object.assign({}, cfg);
-  const qualityPx = { low: 480, medium: 720, high: 1080 };
+  const qualityPx = { low: 420, medium: 720, high: 1080 };
+  let autoScale = 1.0;
+  const perfMon = { frames: 0, lastCheck: performance.now(), fps: 60 };
+
+  const PRESETS = {
+    clasico: { levels:5, edgeStrength:0.95, edgeThreshold:0.2, saturation:1.7, smooth:0.5, brightness:0.02, contrast:1.18, flatness:0.62, lineThickness:1.5 },
+    vivido:  { levels:6, edgeStrength:0.8,  edgeThreshold:0.18, saturation:2.2, smooth:0.45, brightness:0.03, contrast:1.22, flatness:0.5, lineThickness:1.2 },
+    comic:   { levels:4, edgeStrength:1.0,  edgeThreshold:0.16, saturation:1.8, smooth:0.55, brightness:0.02, contrast:1.2, flatness:0.72, lineThickness:2.3 }
+  };
 
   let facingMode = 'environment';
   let currentStream = null;
@@ -356,10 +384,10 @@
      3. WebGL
      ============================================================ */
   let gl, quadBuffer;
-  let progBlur, progBlend, progFinal;
+  let progBlur, progBilateral, progBlend, progFinal;
   let videoTex;
   let internalW = 640, internalH = 360;
-  let fboBlur, fboSmoothA, fboSmoothB;
+  let fboBlur, fboBilateral, fboSmoothA, fboSmoothB;
   let flip = false; // ping-pong
   let cropRect = [0, 0, 1, 1];
   let rafId = null;
@@ -416,6 +444,37 @@
     }
   `;
 
+  // Filtro bilateral: aplana el color como una caricatura real (zonas solidas)
+  // conservando los bordes intactos, sin manchar ni mezclar colores distintos.
+  const FS_BILATERAL = `
+    precision mediump float;
+    varying vec2 vUv;
+    uniform sampler2D uTex;
+    uniform vec2 uTexel;
+    uniform float uFlatness;
+    void main(){
+      vec3 centerColor = texture2D(uTex, vUv).rgb;
+      vec3 sumColor = vec3(0.0);
+      float sumWeight = 0.0;
+      float sigma = mix(0.015, 0.32, uFlatness);
+      for (int y = -2; y <= 2; y++){
+        for (int x = -2; x <= 2; x++){
+          vec2 offset = vec2(float(x), float(y)) * uTexel * 1.4;
+          vec3 sampleColor = texture2D(uTex, vUv + offset).rgb;
+          float distSq = float(x*x + y*y);
+          float spatial = max(1.0 - distSq / 18.0, 0.0);
+          float colorDist = distance(sampleColor, centerColor);
+          float rangeWeight = exp(-(colorDist*colorDist) / (2.0*sigma*sigma + 0.0001));
+          float w = spatial * rangeWeight;
+          sumColor += sampleColor * w;
+          sumWeight += w;
+        }
+      }
+      vec3 result = sumWeight > 0.0001 ? sumColor / sumWeight : centerColor;
+      gl_FragColor = vec4(result, 1.0);
+    }
+  `;
+
   const FS_FINAL = `
     precision mediump float;
     varying vec2 vUv;
@@ -424,37 +483,67 @@
     uniform float uLevels;
     uniform float uEdgeThreshold;
     uniform float uEdgeStrength;
+    uniform float uLineThickness;
     uniform float uSaturation;
     uniform float uBrightness;
     uniform float uContrast;
 
     float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
 
+    vec3 rgb2hsv(vec3 c){
+      vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+      vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+      vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+      float d = q.x - min(q.w, q.y);
+      float e = 1.0e-10;
+      return vec3(abs(q.z + (q.w - q.y) / (6.0*d+e)), d / (q.x+e), q.x);
+    }
+    vec3 hsv2rgb(vec3 c){
+      vec4 K = vec4(1.0, 2.0/3.0, 1.0/3.0, 3.0);
+      vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+      return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+    }
+
+    float edgeAt(vec2 uv, vec2 texel){
+      float tl = luma(texture2D(uTex, uv + vec2(-texel.x,-texel.y)).rgb);
+      float t  = luma(texture2D(uTex, uv + vec2( 0.0,     -texel.y)).rgb);
+      float tr = luma(texture2D(uTex, uv + vec2( texel.x,-texel.y)).rgb);
+      float l_ = luma(texture2D(uTex, uv + vec2(-texel.x, 0.0)).rgb);
+      float r_ = luma(texture2D(uTex, uv + vec2( texel.x, 0.0)).rgb);
+      float bl = luma(texture2D(uTex, uv + vec2(-texel.x, texel.y)).rgb);
+      float b  = luma(texture2D(uTex, uv + vec2( 0.0,      texel.y)).rgb);
+      float br = luma(texture2D(uTex, uv + vec2( texel.x, texel.y)).rgb);
+      float gx = -tl - 2.0*l_ - bl + tr + 2.0*r_ + br;
+      float gy = -tl - 2.0*t  - tr + bl + 2.0*b  + br;
+      return sqrt(gx*gx + gy*gy);
+    }
+
     void main(){
       vec3 color = texture2D(uTex, vUv).rgb;
 
-      float l = luma(color);
-      color = mix(vec3(l), color, uSaturation);
-      color = (color - 0.5) * uContrast + 0.5 + uBrightness;
-      color = clamp(color, 0.0, 1.0);
+      // Viveza (vibrance): realza el color sin quemar tonos de piel ya saturados,
+      // manteniendo el tono (hue) intacto -> nada de distorsion de color.
+      vec3 hsv = rgb2hsv(color);
+      float vib = (uSaturation - 1.0);
+      hsv.y = clamp(hsv.y + vib * (1.0 - hsv.y) * 0.9, 0.0, 1.0);
 
-      vec3 posterized = floor(color * uLevels + 0.5) / uLevels;
+      hsv.z = clamp((hsv.z - 0.5) * uContrast + 0.5 + uBrightness, 0.0, 1.0);
 
-      float tl = luma(texture2D(uTex, vUv + vec2(-uTexel.x,-uTexel.y)).rgb);
-      float t  = luma(texture2D(uTex, vUv + vec2( 0.0,     -uTexel.y)).rgb);
-      float tr = luma(texture2D(uTex, vUv + vec2( uTexel.x,-uTexel.y)).rgb);
-      float l_ = luma(texture2D(uTex, vUv + vec2(-uTexel.x, 0.0)).rgb);
-      float r_ = luma(texture2D(uTex, vUv + vec2( uTexel.x, 0.0)).rgb);
-      float bl = luma(texture2D(uTex, vUv + vec2(-uTexel.x, uTexel.y)).rgb);
-      float b  = luma(texture2D(uTex, vUv + vec2( 0.0,      uTexel.y)).rgb);
-      float br = luma(texture2D(uTex, vUv + vec2( uTexel.x, uTexel.y)).rgb);
+      // Posterizado tipo "cel-shading" conservando el tono -> colores puros y planos
+      float levels = uLevels;
+      hsv.z = floor(hsv.z * levels + 0.5) / levels;
+      hsv.y = floor(hsv.y * (levels*0.8) + 0.5) / max(levels*0.8, 1.0);
 
-      float gx = -tl - 2.0*l_ - bl + tr + 2.0*r_ + br;
-      float gy = -tl - 2.0*t  - tr + bl + 2.0*b  + br;
-      float edge = sqrt(gx*gx + gy*gy);
-      float edgeFactor = smoothstep(uEdgeThreshold, uEdgeThreshold + 0.15, edge) * uEdgeStrength;
+      vec3 toonColor = hsv2rgb(clamp(hsv, 0.0, 1.0));
 
-      vec3 finalColor = mix(posterized, vec3(0.04, 0.04, 0.07), edgeFactor);
+      // Lineas de tinta gruesas (doble radio = efecto de dilatacion, como comic real)
+      float e1 = edgeAt(vUv, uTexel * uLineThickness);
+      float e2 = edgeAt(vUv, uTexel * uLineThickness * 2.0);
+      float edge = max(e1, e2);
+      float edgeFactor = smoothstep(uEdgeThreshold, uEdgeThreshold + 0.12, edge) * uEdgeStrength;
+
+      vec3 ink = vec3(0.055, 0.05, 0.09);
+      vec3 finalColor = mix(toonColor, ink, edgeFactor);
       gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
@@ -503,6 +592,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 
     progBlur = createProgram(VS, FS_BLUR);
+    progBilateral = createProgram(VS, FS_BILATERAL);
     progBlend = createProgram(VS, FS_BLEND);
     progFinal = createProgram(VS, FS_FINAL);
 
@@ -531,20 +621,42 @@
     if (canvas.width !== w || canvas.height !== h){
       canvas.width = w; canvas.height = h;
     }
-    const target = qualityPx[cfg.quality] || 720;
+    const target = cfg.quality === 'auto' ? (920 * autoScale) : (qualityPx[cfg.quality] || 720);
     const scale = Math.min(1, target / Math.max(w, h));
     internalW = Math.max(160, Math.round(w * scale));
     internalH = Math.max(160, Math.round(h * scale));
 
     if (gl){
       if (fboBlur){ gl.deleteFramebuffer(fboBlur.fbo); gl.deleteTexture(fboBlur.tex); }
+      if (fboBilateral){ gl.deleteFramebuffer(fboBilateral.fbo); gl.deleteTexture(fboBilateral.tex); }
       if (fboSmoothA){ gl.deleteFramebuffer(fboSmoothA.fbo); gl.deleteTexture(fboSmoothA.tex); }
       if (fboSmoothB){ gl.deleteFramebuffer(fboSmoothB.fbo); gl.deleteTexture(fboSmoothB.tex); }
       fboBlur = createFBOTexture(internalW, internalH);
+      fboBilateral = createFBOTexture(internalW, internalH);
       fboSmoothA = createFBOTexture(internalW, internalH);
       fboSmoothB = createFBOTexture(internalW, internalH);
     }
     computeCrop();
+  }
+
+  // Ajuste automatico de calidad en tiempo real para que la app nunca se trabe ni se congele.
+  function autoQualityWatch(now){
+    perfMon.frames++;
+    const elapsed = now - perfMon.lastCheck;
+    if (elapsed >= 1200){
+      perfMon.fps = (perfMon.frames * 1000) / elapsed;
+      perfMon.frames = 0;
+      perfMon.lastCheck = now;
+      if (cfg.quality === 'auto'){
+        if (perfMon.fps < 22 && autoScale > 0.4){
+          autoScale = Math.max(0.4, autoScale - 0.12);
+          resizeCanvasAndBuffers();
+        } else if (perfMon.fps > 50 && autoScale < 1.0){
+          autoScale = Math.min(1.0, autoScale + 0.08);
+          resizeCanvasAndBuffers();
+        }
+      }
+    }
   }
 
   function computeCrop(){
@@ -562,9 +674,10 @@
     cropRect = [cx, cy, cw, ch];
   }
 
-  function renderFrame(){
+  function renderFrame(now){
     rafId = requestAnimationFrame(renderFrame);
     if (!gl || video.readyState < 2 || video.videoWidth === 0) return;
+    autoQualityWatch(now || performance.now());
 
     gl.bindTexture(gl.TEXTURE_2D, videoTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
@@ -572,7 +685,7 @@
     const texelVideo = [1 / video.videoWidth, 1 / video.videoHeight];
     const texelInternal = [1 / internalW, 1 / internalH];
 
-    // Pass 1: blur + crop (cover fit, sin distorsion) + mirror
+    // Pass 1: recorte "cover" (sin distorsion de proporcion) + espejo + suavizado ligero de ruido
     gl.bindFramebuffer(gl.FRAMEBUFFER, fboBlur.fbo);
     gl.viewport(0,0,internalW, internalH);
     gl.useProgram(progBlur);
@@ -585,7 +698,19 @@
     gl.uniform1f(gl.getUniformLocation(progBlur, 'uMirror'), mirror ? 1.0 : 0.0);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-    // Pass 2: temporal blend (estabilizacion) ping-pong
+    // Pass 2: filtro bilateral -> aplana el color en zonas solidas como caricatura real
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboBilateral.fbo);
+    gl.viewport(0,0,internalW, internalH);
+    gl.useProgram(progBilateral);
+    bindQuad(progBilateral);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fboBlur.tex);
+    gl.uniform1i(gl.getUniformLocation(progBilateral, 'uTex'), 0);
+    gl.uniform2fv(gl.getUniformLocation(progBilateral, 'uTexel'), texelInternal);
+    gl.uniform1f(gl.getUniformLocation(progBilateral, 'uFlatness'), cfg.flatness);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // Pass 3: estabilizacion temporal (ping-pong) -> colores fijos sin parpadeo
     const prev = flip ? fboSmoothA : fboSmoothB;
     const curr = flip ? fboSmoothB : fboSmoothA;
     gl.bindFramebuffer(gl.FRAMEBUFFER, curr.fbo);
@@ -593,7 +718,7 @@
     gl.useProgram(progBlend);
     bindQuad(progBlend);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, fboBlur.tex);
+    gl.bindTexture(gl.TEXTURE_2D, fboBilateral.tex);
     gl.uniform1i(gl.getUniformLocation(progBlend, 'uCurr'), 0);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, prev.tex);
@@ -602,7 +727,7 @@
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     flip = !flip;
 
-    // Pass 3: cartoon final -> pantalla
+    // Pass 4: composicion final caricatura (colores puros + tinta gruesa) -> pantalla
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0,0,canvas.width, canvas.height);
     gl.useProgram(progFinal);
@@ -614,6 +739,7 @@
     gl.uniform1f(gl.getUniformLocation(progFinal, 'uLevels'), cfg.levels);
     gl.uniform1f(gl.getUniformLocation(progFinal, 'uEdgeThreshold'), cfg.edgeThreshold);
     gl.uniform1f(gl.getUniformLocation(progFinal, 'uEdgeStrength'), cfg.edgeStrength);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uLineThickness'), cfg.lineThickness);
     gl.uniform1f(gl.getUniformLocation(progFinal, 'uSaturation'), cfg.saturation);
     gl.uniform1f(gl.getUniformLocation(progFinal, 'uBrightness'), cfg.brightness);
     gl.uniform1f(gl.getUniformLocation(progFinal, 'uContrast'), cfg.contrast);
@@ -645,6 +771,7 @@
       await new Promise(res => { video.onloadedmetadata = () => { video.play().then(res).catch(res); }; });
       resizeCanvasAndBuffers();
       setupTrackFeatures();
+      applyAutoCameraSettings();
       loadingScreen.classList.add('hidden');
     } catch(err){
       console.error(err);
@@ -699,6 +826,21 @@
     }
   }
 
+  // Modo automatico profesional: enfoque, exposicion y balance de blancos continuos
+  // para que el color se mantenga fiel y estable, sin distorsion, en cualquier luz.
+  async function applyAutoCameraSettings(){
+    if (!currentTrack || !currentTrack.applyConstraints) return;
+    const attempts = [
+      { advanced: [{ whiteBalanceMode: 'continuous' }] },
+      { advanced: [{ exposureMode: 'continuous' }] },
+      { advanced: [{ focusMode: 'continuous' }] },
+      { advanced: [{ sharpness: 1 }] }
+    ];
+    for (const c of attempts){
+      try { await currentTrack.applyConstraints(c); } catch(e){ /* no soportado, se ignora */ }
+    }
+  }
+
   document.getElementById('flipBtn').addEventListener('click', () => {
     const next = facingMode === 'environment' ? 'user' : 'environment';
     startCamera(next);
@@ -750,7 +892,8 @@
   });
 
   const sliderMap = [
-    ['levels','valLevels'], ['edgeStrength','valEdgeStrength'], ['edgeThreshold','valEdgeThreshold'],
+    ['levels','valLevels'], ['flatness','valFlatness'], ['edgeStrength','valEdgeStrength'],
+    ['lineThickness','valLineThickness'], ['edgeThreshold','valEdgeThreshold'],
     ['saturation','valSaturation'], ['smooth','valSmooth'], ['brightness','valBrightness'], ['contrast','valContrast']
   ];
   function syncSlidersFromCfg(){
@@ -770,6 +913,7 @@
   });
   document.getElementById('quality').addEventListener('change', (e) => {
     cfg.quality = e.target.value;
+    if (cfg.quality === 'auto') autoScale = 1.0;
     resizeCanvasAndBuffers();
   });
   document.getElementById('micToggle').addEventListener('change', (e) => {
@@ -779,6 +923,14 @@
     Object.assign(cfg, DEFAULTS);
     syncSlidersFromCfg();
     resizeCanvasAndBuffers();
+  });
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = PRESETS[btn.dataset.preset];
+      if (!preset) return;
+      Object.assign(cfg, preset);
+      syncSlidersFromCfg();
+    });
   });
   syncSlidersFromCfg();
 

@@ -1,661 +1,972 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>HLS Converter Pro — Conversor MP4 a HLS (Estático, 100% en tu navegador)</title>
-<meta name="description" content="Convierte video MP4 a HLS (.m3u8 + .ts) con perfiles Estándar 720p y Alta Calidad 1080p listos para TV en vivo 24/7. Todo el procesamiento ocurre en tu navegador, sin subir archivos a ningún servidor." />
-<meta name="theme-color" content="#0a0e1a" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2306b6d4'/%3E%3Ctext x='50' y='68' font-size='46' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3EHLS%3C/text%3E%3C/svg%3E" />
-
-<!-- Tailwind CSS -->
+<meta charset="UTF-8">
+<title>Doodle World Lens — Cámara Caricatura</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="Doodle World Lens: convierte la cámara de tu móvil o tablet en video 100% estilo caricatura / cartoon en tiempo real, sin distorsión y súper fluido.">
+<meta name="theme-color" content="#0b0620">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Doodle Lens">
+<meta name="format-detection" content="telephone=no">
+<link id="manifestLink" rel="manifest" href="">
+<link id="appleTouchIcon" rel="apple-touch-icon" href="">
+<link id="favicon" rel="icon" href="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-
-<!-- hls.js for live preview of generated HLS output -->
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" defer></script>
-
-<!-- JSZip to package playlist.m3u8 + segments for download -->
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" defer></script>
-
-<!-- FFmpeg WebAssembly (runs entirely client-side, no server/upload involved) -->
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js"></script>
-
 <style>
-  :root{ --accent:#06b6d4; --accent2:#6366f1; --bg:#0a0e1a; --bg2:#121829; --card:#161d31; }
-  body{ background:var(--bg); font-family:'Segoe UI',Roboto,Arial,sans-serif; }
-  .grad-text{ background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .card{ background:var(--card); border:1px solid rgba(255,255,255,.07); }
-  .dropzone{ border:2px dashed rgba(255,255,255,.18); transition:.2s; }
-  .dropzone.drag{ border-color:var(--accent); background:rgba(6,182,212,.06); }
-  .profile-card{ transition:.15s; cursor:pointer; }
-  .profile-card.selected{ border-color:var(--accent); box-shadow:0 0 0 2px rgba(6,182,212,.35); background:rgba(6,182,212,.05); }
-  .fps-btn.selected{ background:var(--accent); color:#04222a; font-weight:800; }
-  #progressBarFill{ transition:width .3s ease; }
-  ::-webkit-scrollbar{ width:8px; height:8px; }
-  ::-webkit-scrollbar-thumb{ background:#333a52; border-radius:8px; }
-  .mono{ font-family:'Courier New',monospace; }
-  .toast{ animation:fadein .25s ease; }
-  @keyframes fadein{ from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
-  .spin{ animation:spin 1s linear infinite; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .step-num{ width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px; }
+  html, body { height: 100%; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  body { font-family: 'Poppins', sans-serif; }
+  .font-toon { font-family: 'Baloo 2', cursive; }
+  #glcanvas { touch-action: none; }
+  ::-webkit-scrollbar { display: none; }
+
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    height: 8px; border-radius: 999px;
+    background: linear-gradient(90deg,#f472b6,#a78bfa,#38bdf8);
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 999px;
+    background: #fff; border: 3px solid #7c3aed;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4); cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 999px;
+    background: #fff; border: 3px solid #7c3aed; cursor: pointer;
+  }
+
+  .toon-btn {
+    box-shadow: 0 4px 0 rgba(0,0,0,.35), 0 6px 14px rgba(0,0,0,.35);
+    transition: transform .08s ease, box-shadow .08s ease;
+  }
+  .toon-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.35); }
+
+  .rec-dot { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .safe-top { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+  .safe-bottom { padding-bottom: max(0.9rem, env(safe-area-inset-bottom)); }
+
+  .panel-slide { transition: transform .25s ease, opacity .25s ease; }
+
+  .comic-outline {
+    -webkit-text-stroke: 2px #1e1b4b;
+    paint-order: stroke fill;
+  }
 </style>
 </head>
-<body class="text-gray-200 min-h-screen">
+<body class="bg-black text-white fixed inset-0 select-none">
+<div id="app" class="relative w-full h-full overflow-hidden bg-black">
 
-<!-- ===================== HEADER ===================== -->
-<header class="sticky top-0 z-40 backdrop-blur bg-[#0a0e1a]/90 border-b border-white/10">
-  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center font-black text-[#0a0e1a] text-xs">HLS</div>
-      <div>
-        <p class="font-extrabold text-white leading-none">Converter <span class="grad-text">Pro</span></p>
-        <p class="text-[10px] text-gray-500 leading-none mt-0.5">MP4 → HLS · 100% en tu navegador</p>
-      </div>
+  <video id="video" playsinline autoplay muted class="hidden"></video>
+  <canvas id="glcanvas" class="absolute inset-0 w-full h-full block bg-black"></canvas>
+
+  <!-- FLASH al capturar -->
+  <div id="flashFx" class="pointer-events-none absolute inset-0 bg-white opacity-0 z-40"></div>
+
+  <!-- SPLASH / START SCREEN -->
+  <div id="startScreen" class="absolute inset-0 z-50 flex flex-col items-center justify-center gap-6 p-6 text-center bg-gradient-to-br from-fuchsia-600 via-violet-600 to-sky-500">
+    <div class="w-28 h-28 rounded-3xl bg-white/15 backdrop-blur flex items-center justify-center border-4 border-white/40 shadow-2xl">
+      <span class="text-6xl">🎨</span>
     </div>
-    <div class="hidden sm:flex items-center gap-2 text-xs text-gray-400">
-      <span id="engineStatusDot" class="w-2 h-2 rounded-full bg-gray-500"></span>
-      <span id="engineStatusText">Motor no cargado</span>
+    <h1 class="font-toon comic-outline text-4xl sm:text-5xl font-800 text-white drop-shadow-lg">Doodle World Lens</h1>
+    <p class="max-w-md text-sm sm:text-base text-white/90 font-medium leading-relaxed">
+      Convierte lo que graba tu cámara en una <b>caricatura animada real</b>, con colores vivos y estables, líneas de cómic y cero distorsión. Funciona con cámara delantera y trasera, en móviles y tablets.
+    </p>
+    <button id="startBtn" class="toon-btn font-toon text-lg sm:text-xl bg-amber-400 hover:bg-amber-300 text-indigo-900 font-bold py-4 px-10 rounded-full border-4 border-white/70">
+      ▶ Activar cámara y comenzar
+    </button>
+    <p class="text-xs text-white/70 max-w-xs">Se solicitará permiso de cámara (y micrófono para grabar con sonido). Todo se procesa en tu dispositivo, nada se sube a internet.</p>
+    <div id="iosInstallTip" class="hidden text-xs text-white bg-black/30 rounded-xl px-4 py-2 max-w-xs">
+      📲 Para instalar: toca <b>Compartir</b> en Safari y luego <b>“Agregar a inicio”</b>.
     </div>
   </div>
-</header>
 
-<div id="fileProtocolWarning" class="hidden max-w-6xl mx-auto mt-4 mx-4 md:mx-auto px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm">
-  ⚠️ Estás abriendo este archivo directamente (file://). Por restricciones del navegador, el motor de conversión requiere que la página se sirva por http/https (por ejemplo con un servidor local o publicándola en cualquier hosting estático). Súbela a un hosting estático o ábrela con un servidor local para que la conversión funcione.
-</div>
-
-<!-- ===================== MAIN ===================== -->
-<main class="max-w-6xl mx-auto px-4 py-8">
-
-  <!-- HERO -->
-  <div class="text-center mb-10">
-    <h1 class="text-3xl md:text-4xl font-black text-white mb-3">Conversor Profesional de Video a <span class="grad-text">HLS</span></h1>
-    <p class="text-gray-400 max-w-2xl mx-auto">Sube tu video (hasta 3 GB), elige un perfil de calidad y obtén un paquete HLS (.m3u8 + segmentos .ts) listo para transmitir en TV en vivo 24/7, con GOP fijo, bitrate controlado y audio normalizado — todo procesado localmente en tu navegador, sin subir el archivo a ningún servidor.</p>
+  <!-- LOADING -->
+  <div id="loadingScreen" class="hidden absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/85">
+    <div class="w-16 h-16 border-4 border-fuchsia-400 border-t-transparent rounded-full spin"></div>
+    <p class="font-toon text-lg">Preparando tu mundo caricatura...</p>
   </div>
 
-  <!-- STEP 1: Upload -->
-  <section class="card rounded-2xl p-5 md:p-6 mb-6">
-    <div class="flex items-center gap-2 mb-4">
-      <span class="step-num bg-cyan-500 text-[#04222a]">1</span>
-      <h2 class="text-white font-bold text-lg">Sube tu archivo de video</h2>
+  <!-- ERROR -->
+  <div id="errorScreen" class="hidden absolute inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/95 p-6 text-center">
+    <span class="text-5xl">😵</span>
+    <p id="errorMsg" class="font-toon text-lg max-w-sm">No se pudo acceder a la cámara.</p>
+    <button id="retryBtn" class="toon-btn bg-fuchsia-500 hover:bg-fuchsia-400 font-bold py-3 px-8 rounded-full">Reintentar</button>
+  </div>
+
+  <!-- TOP BAR -->
+  <div id="topBar" class="hidden absolute top-0 inset-x-0 z-20 flex items-center justify-between px-3 safe-top pointer-events-none">
+    <div class="pointer-events-auto flex items-center gap-2 bg-black/35 backdrop-blur rounded-full pl-2 pr-3 py-1.5 border border-white/10">
+      <span class="text-xl">🖍️</span>
+      <span class="font-toon font-bold text-sm sm:text-base">Doodle World</span>
+    </div>
+    <div class="pointer-events-auto flex items-center gap-2">
+      <button id="installBtn" class="hidden toon-btn bg-amber-400 text-indigo-900 text-xs font-bold px-3 py-2 rounded-full">⬇ Instalar</button>
+      <button id="torchBtn" class="hidden toon-btn bg-black/40 border border-white/20 w-10 h-10 rounded-full text-lg">🔦</button>
+      <button id="fullscreenBtn" class="toon-btn bg-black/40 border border-white/20 w-10 h-10 rounded-full text-lg">⛶</button>
+      <button id="settingsBtn" class="toon-btn bg-black/40 border border-white/20 w-10 h-10 rounded-full text-lg">⚙️</button>
+    </div>
+  </div>
+
+  <!-- REC indicator -->
+  <div id="recBadge" class="hidden absolute top-16 left-1/2 -translate-x-1/2 z-20 items-center gap-2 bg-black/50 backdrop-blur px-3 py-1.5 rounded-full border border-red-400/60">
+    <span class="w-2.5 h-2.5 rounded-full bg-red-500 rec-dot"></span>
+    <span id="recTimer" class="text-sm font-mono">00:00</span>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div id="bottomBar" class="hidden absolute bottom-0 inset-x-0 z-20 flex items-center justify-between px-6 safe-bottom pb-4">
+    <button id="thumbBtn" class="w-14 h-14 rounded-2xl overflow-hidden border-2 border-white/60 bg-white/10 flex items-center justify-center toon-btn">
+      <span id="thumbPlaceholder" class="text-2xl">🖼️</span>
+      <img id="thumbImg" class="hidden w-full h-full object-cover" />
+    </button>
+
+    <div class="flex items-center gap-6">
+      <button id="photoBtn" title="Tomar foto" class="toon-btn w-16 h-16 rounded-full bg-white border-4 border-fuchsia-400 flex items-center justify-center text-2xl">📸</button>
+      <button id="recordBtn" title="Grabar video" class="toon-btn w-20 h-20 rounded-full bg-red-500 border-4 border-white flex items-center justify-center text-3xl">⏺</button>
     </div>
 
-    <div id="dropzone" class="dropzone rounded-xl p-8 text-center cursor-pointer">
-      <input type="file" id="fileInput" accept="video/*,.mp4,.mov,.mkv,.avi,.webm,.m4v" class="hidden" />
-      <div class="text-4xl mb-2">🎬</div>
-      <p class="text-white font-semibold">Arrastra tu video aquí o haz clic para seleccionar</p>
-      <p class="text-gray-500 text-sm mt-1">Formatos: MP4, MOV, MKV, AVI, WEBM · Tamaño máximo: 3 GB</p>
-    </div>
+    <button id="flipBtn" title="Cambiar cámara" class="toon-btn w-14 h-14 rounded-2xl bg-black/40 border border-white/20 flex items-center justify-center text-2xl">🔄</button>
+  </div>
 
-    <div id="fileInfoCard" class="hidden mt-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between bg-white/5 rounded-xl p-4">
-      <div class="flex items-center gap-3 min-w-0">
-        <div class="w-11 h-11 rounded-lg bg-cyan-500/20 flex items-center justify-center text-xl shrink-0">📼</div>
-        <div class="min-w-0">
-          <p id="fileNameText" class="text-white font-semibold truncate"></p>
-          <p id="fileMetaText" class="text-gray-400 text-xs"></p>
-        </div>
+  <!-- SETTINGS PANEL -->
+  <div id="settingsPanel" class="hidden absolute inset-x-0 bottom-0 z-30 panel-slide translate-y-full">
+    <div class="bg-[#170f33]/95 backdrop-blur border-t-4 border-fuchsia-500 rounded-t-3xl p-5 pb-8 max-h-[85vh] overflow-y-auto safe-bottom">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-toon text-xl font-bold">🎛️ Ajustes del Lens Caricatura</h2>
+        <button id="closeSettings" class="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-lg">✕</button>
       </div>
-      <button onclick="App.resetFile()" class="shrink-0 text-xs font-bold px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white">Quitar archivo</button>
-    </div>
-    <p id="fileError" class="hidden mt-3 text-red-400 text-sm font-semibold"></p>
-  </section>
 
-  <!-- STEP 2: Profile selection -->
-  <section id="profileSection" class="card rounded-2xl p-5 md:p-6 mb-6 opacity-40 pointer-events-none transition">
-    <div class="flex items-center gap-2 mb-4">
-      <span class="step-num bg-cyan-500 text-[#04222a]">2</span>
-      <h2 class="text-white font-bold text-lg">Elige el perfil de conversión</h2>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-4">
-      <div class="profile-card selected card rounded-xl p-5 border-2 border-transparent" id="cardStd" onclick="App.selectProfile('std')">
-        <div class="flex items-center justify-between mb-2">
-          <p class="text-white font-extrabold text-lg">Estándar</p>
-          <span class="text-[10px] font-bold bg-cyan-500/20 text-cyan-300 px-2 py-1 rounded-full">RECOMENDADO 24/7</span>
-        </div>
-        <p class="text-gray-400 text-sm mb-3">720p — Ideal para canales de emisión continua: 50% menos ancho de banda, carga instantánea en móviles y Smart TV.</p>
-        <ul class="text-xs text-gray-500 space-y-1">
-          <li>• 1280×720 · 30 fps</li>
-          <li>• Video ~2000 kbps (max 2200k)</li>
-          <li>• H.264 High Profile · Nivel 4.1</li>
-          <li>• Audio AAC-LC 128 kbps</li>
-        </ul>
-      </div>
-
-      <div class="profile-card card rounded-xl p-5 border-2 border-transparent" id="cardHq" onclick="App.selectProfile('hq')">
-        <div class="flex items-center justify-between mb-2">
-          <p class="text-white font-extrabold text-lg">Alta Calidad</p>
-          <span class="text-[10px] font-bold bg-indigo-500/20 text-indigo-300 px-2 py-1 rounded-full">PANTALLAS GRANDES</span>
-        </div>
-        <p class="text-gray-400 text-sm mb-3">1080p — Máxima nitidez para pantallas grandes y contenido premium.</p>
-        <ul class="text-xs text-gray-500 space-y-1">
-          <li>• 1920×1080</li>
-          <li>• Video ~4000 kbps (max 4500k)</li>
-          <li>• H.264 High Profile · Nivel 4.2</li>
-          <li>• Audio AAC-LC 160 kbps</li>
-        </ul>
-        <div id="fpsSelector" class="hidden mt-3 flex items-center gap-2">
-          <span class="text-xs text-gray-400 font-semibold">Framerate:</span>
-          <button type="button" class="fps-btn selected text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 text-white" onclick="event.stopPropagation(); App.setHqFps(30, event)">30 fps</button>
-          <button type="button" class="fps-btn text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 text-white" onclick="event.stopPropagation(); App.setHqFps(60, event)">60 fps</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Auto-synced configuration summary -->
-    <div class="mt-5 rounded-xl bg-black/30 p-4">
-      <div class="flex items-center gap-2 mb-3">
-        <span class="text-green-400">✔</span>
-        <p class="text-white font-bold text-sm">Configuración auto-sincronizada del perfil</p>
-      </div>
-      <div id="configSummary" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs"></div>
-      <p class="text-[11px] text-gray-500 mt-3">Estos valores se aplican automáticamente y de forma coherente al códec, bitrate, GOP y audio — no requieren ajuste manual, siguiendo las buenas prácticas de HLS para TV en vivo (GOP fijo = 2×fps, segmentos de 4s, bitrate acotado con maxrate/bufsize y normalización de loudness a -14 LUFS).</p>
-    </div>
-  </section>
-
-  <!-- STEP 3: Convert -->
-  <section id="convertSection" class="card rounded-2xl p-5 md:p-6 mb-6 opacity-40 pointer-events-none transition">
-    <div class="flex items-center gap-2 mb-4">
-      <span class="step-num bg-cyan-500 text-[#04222a]">3</span>
-      <h2 class="text-white font-bold text-lg">Convertir a HLS</h2>
-    </div>
-
-    <div class="flex flex-col sm:flex-row gap-3">
-      <button id="btnConvert" onclick="App.startConversion()" class="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:brightness-110 text-white font-extrabold py-3 rounded-xl flex items-center justify-center gap-2">
-        ⚙️ Convertir ahora
-      </button>
-      <button id="btnCancel" onclick="App.cancelConversion()" class="hidden sm:w-40 bg-red-600/80 hover:bg-red-600 text-white font-bold py-3 rounded-xl">Cancelar</button>
-    </div>
-
-    <div id="progressBox" class="hidden mt-5">
-      <div class="flex justify-between text-xs text-gray-400 mb-1">
-        <span id="progressLabel">Preparando...</span>
-        <span id="progressPct">0%</span>
-      </div>
-      <div class="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
-        <div id="progressBarFill" class="h-full bg-gradient-to-r from-cyan-400 to-indigo-500" style="width:0%"></div>
-      </div>
-      <div class="flex justify-between text-[11px] text-gray-500 mt-1">
-        <span id="elapsedTimeText">Tiempo transcurrido: 0s</span>
-        <button onclick="App.toggleLog()" class="underline hover:text-gray-300">Ver registro técnico</button>
-      </div>
-      <pre id="logBox" class="hidden mt-2 h-40 overflow-y-auto bg-black/50 rounded-lg p-3 text-[10px] text-green-400 mono whitespace-pre-wrap"></pre>
-    </div>
-  </section>
-
-  <!-- STEP 4: Result -->
-  <section id="resultSection" class="hidden card rounded-2xl p-5 md:p-6 mb-6">
-    <div class="flex items-center gap-2 mb-4">
-      <span class="step-num bg-green-500 text-[#04222a]">✔</span>
-      <h2 class="text-white font-bold text-lg">Conversión completa</h2>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-5">
-      <div>
-        <video id="previewVideo" controls class="w-full rounded-xl bg-black aspect-video"></video>
-        <p class="text-[11px] text-gray-500 mt-2">Previsualización reproduciendo directamente los segmentos HLS generados (usando hls.js), sin reprocesar nada.</p>
-      </div>
-      <div class="flex flex-col justify-between">
+      <div class="space-y-5 text-sm">
         <div>
-          <p class="text-white font-bold mb-2">Paquete generado</p>
-          <div id="resultFilesList" class="text-xs text-gray-400 space-y-1 max-h-40 overflow-y-auto mb-4 bg-black/30 rounded-lg p-3"></div>
-          <p id="resultSummaryText" class="text-sm text-gray-300 mb-4"></p>
+          <label class="flex justify-between mb-1"><span>🎨 Niveles de color (posterizado)</span><span id="valLevels" class="font-mono"></span></label>
+          <input id="levels" type="range" min="3" max="10" step="1" class="w-full">
         </div>
-        <div class="flex flex-col sm:flex-row gap-3">
-          <button onclick="App.downloadZip()" class="flex-1 bg-gradient-to-r from-cyan-500 to-indigo-500 hover:brightness-110 text-white font-extrabold py-3 rounded-xl">⬇ Descargar paquete HLS (.zip)</button>
-          <button onclick="App.resetAll()" class="sm:w-40 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl">Nueva conversión</button>
+        <div>
+          <label class="flex justify-between mb-1"><span>✏️ Grosor de líneas de cómic</span><span id="valEdgeStrength" class="font-mono"></span></label>
+          <input id="edgeStrength" type="range" min="0" max="1" step="0.01" class="w-full">
         </div>
-        <p class="text-[11px] text-gray-500 mt-3">El ZIP incluye <span class="mono">playlist.m3u8</span>, todos los segmentos <span class="mono">.ts</span> y un archivo <span class="mono">LEEME.txt</span> con instrucciones de despliegue.</p>
+        <div>
+          <label class="flex justify-between mb-1"><span>🔍 Detalle de trazos</span><span id="valEdgeThreshold" class="font-mono"></span></label>
+          <input id="edgeThreshold" type="range" min="0.05" max="0.6" step="0.01" class="w-full">
+        </div>
+        <div>
+          <label class="flex justify-between mb-1"><span>🌈 Saturación de colores</span><span id="valSaturation" class="font-mono"></span></label>
+          <input id="saturation" type="range" min="0.5" max="2.5" step="0.01" class="w-full">
+        </div>
+        <div>
+          <label class="flex justify-between mb-1"><span>🧊 Estabilidad de imagen</span><span id="valSmooth" class="font-mono"></span></label>
+          <input id="smooth" type="range" min="0" max="0.9" step="0.01" class="w-full">
+        </div>
+        <div>
+          <label class="flex justify-between mb-1"><span>☀️ Brillo</span><span id="valBrightness" class="font-mono"></span></label>
+          <input id="brightness" type="range" min="-0.2" max="0.2" step="0.01" class="w-full">
+        </div>
+        <div>
+          <label class="flex justify-between mb-1"><span>◐ Contraste</span><span id="valContrast" class="font-mono"></span></label>
+          <input id="contrast" type="range" min="0.7" max="1.6" step="0.01" class="w-full">
+        </div>
+
+        <div id="zoomWrap" class="hidden">
+          <label class="flex justify-between mb-1"><span>🔎 Zoom cámara</span><span id="valZoom" class="font-mono"></span></label>
+          <input id="zoomRange" type="range" min="1" max="5" step="0.1" class="w-full">
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <span>⚡ Calidad de procesamiento</span>
+          <select id="quality" class="bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm">
+            <option value="low">Ahorro (más fluido)</option>
+            <option value="medium" selected>Media</option>
+            <option value="high">Alta (más nítido)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-between pt-1">
+          <span>🎙️ Grabar con audio</span>
+          <input id="micToggle" type="checkbox" checked class="w-6 h-6 accent-fuchsia-500">
+        </div>
+
+        <button id="resetDefaults" class="w-full mt-2 toon-btn bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl py-3 font-bold">↺ Restablecer valores de fábrica</button>
       </div>
     </div>
-  </section>
+  </div>
 
-  <!-- Technical reference table -->
-  <section class="card rounded-2xl p-5 md:p-6">
-    <h2 class="text-white font-bold text-lg mb-4">Referencia técnica aplicada automáticamente</h2>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs md:text-sm text-left">
-        <thead class="text-gray-400 border-b border-white/10">
-          <tr><th class="py-2 pr-4">Parámetro</th><th class="py-2 pr-4">Estándar (720p)</th><th class="py-2">Alta Calidad (1080p)</th></tr>
-        </thead>
-        <tbody class="text-gray-300">
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Resolución</td><td class="py-2 pr-4">1280×720</td><td class="py-2">1920×1080</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Video Bitrate</td><td class="py-2 pr-4">2000 kbps (1800–2200)</td><td class="py-2">4000 kbps (3500–4500)</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Maxrate / Bufsize</td><td class="py-2 pr-4">2200k / 4400k</td><td class="py-2">4500k / 9000k</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Framerate</td><td class="py-2 pr-4">30 fps</td><td class="py-2">30 / 60 fps</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Códec de video</td><td class="py-2 pr-4">H.264 High · Nivel 4.1</td><td class="py-2">H.264 High · Nivel 4.2</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Códec de audio</td><td class="py-2 pr-4">AAC-LC</td><td class="py-2">AAC-LC</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Audio Bitrate</td><td class="py-2 pr-4">128 kbps stereo</td><td class="py-2">160 kbps stereo</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">Frecuencia de audio</td><td class="py-2 pr-4">48000 Hz</td><td class="py-2">48000 Hz</td></tr>
-          <tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold text-white">GOP / Keyframe</td><td class="py-2 pr-4">Fijo, 2s (60 frames @30fps)</td><td class="py-2">Fijo, 2s (60/120 frames)</td></tr>
-          <tr><td class="py-2 pr-4 font-semibold text-white">Segmento HLS</td><td class="py-2 pr-4">4 segundos</td><td class="py-2">4 segundos</td></tr>
-        </tbody>
-      </table>
+  <!-- PREVIEW MODAL -->
+  <div id="previewModal" class="hidden absolute inset-0 z-50 bg-black flex flex-col">
+    <div class="flex items-center justify-between p-4 safe-top">
+      <button id="closePreview" class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-xl">✕</button>
+      <span class="font-toon font-bold">Vista previa</span>
+      <span class="w-10"></span>
     </div>
-    <p class="text-[11px] text-gray-500 mt-4">Todas las conversiones aplican audio estandarizado a 48000 Hz y normalización de loudness a -14 LUFS para evitar desincronización y saltos de volumen al enlazar videos en una misma lista de reproducción HLS o canal en bucle 24/7.</p>
-  </section>
+    <div class="flex-1 flex items-center justify-center overflow-hidden">
+      <img id="previewImg" class="hidden max-w-full max-h-full object-contain" />
+      <video id="previewVideo" class="hidden max-w-full max-h-full object-contain" controls playsinline></video>
+    </div>
+    <div class="flex items-center justify-center gap-4 p-5 safe-bottom">
+      <button id="shareBtn" class="hidden toon-btn bg-sky-500 font-bold py-3 px-6 rounded-full">📤 Compartir</button>
+      <a id="downloadBtn" class="toon-btn bg-emerald-500 font-bold py-3 px-6 rounded-full" download>⬇ Descargar</a>
+      <button id="discardBtn" class="toon-btn bg-red-500/90 font-bold py-3 px-6 rounded-full">🗑 Descartar</button>
+    </div>
+  </div>
 
-  <p class="text-center text-gray-600 text-xs mt-8">Procesamiento 100% local vía WebAssembly (FFmpeg.wasm). Tu video nunca sale de tu dispositivo. El rendimiento depende de la RAM/CPU de tu equipo; se recomienda Chrome o Edge de escritorio para archivos grandes (hasta 3 GB).</p>
-</main>
-
-<div id="toastBox" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 items-end"></div>
+</div>
 
 <script>
 (function(){
-"use strict";
+  "use strict";
 
-const MAX_SIZE = 3 * 1024 * 1024 * 1024; // 3 GB
+  /* ============================================================
+     0. PWA: manifest + service worker + iconos, todo embebido
+     ============================================================ */
+  const iconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#f472b6"/><stop offset="0.5" stop-color="#a78bfa"/><stop offset="1" stop-color="#38bdf8"/>
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="110" fill="url(#g)"/>
+    <circle cx="150" cy="150" r="18" fill="#ffffff" opacity="0.5"/>
+    <circle cx="400" cy="120" r="10" fill="#ffffff" opacity="0.5"/>
+    <circle cx="430" cy="380" r="14" fill="#ffffff" opacity="0.5"/>
+    <circle cx="256" cy="270" r="130" fill="#fff7ed" stroke="#1e1b4b" stroke-width="14"/>
+    <circle cx="205" cy="240" r="16" fill="#1e1b4b"/>
+    <circle cx="310" cy="240" r="16" fill="#1e1b4b"/>
+    <path d="M190 320 Q256 380 322 320" stroke="#1e1b4b" stroke-width="14" fill="none" stroke-linecap="round"/>
+    <path d="M150 150 Q256 90 362 150" stroke="#1e1b4b" stroke-width="14" fill="none" stroke-linecap="round"/>
+  </svg>`;
+  const iconDataUri = 'data:image/svg+xml,' + encodeURIComponent(iconSVG);
+  document.getElementById('appleTouchIcon').setAttribute('href', iconDataUri);
+  document.getElementById('favicon').setAttribute('href', iconDataUri);
 
-const PROFILES = {
-  std: { key:"std", label:"Estándar", width:1280, height:720, videoBitrate:2000, maxrate:2200, bufsize:4400, fps:30, level:"4.1", audioBitrate:128, audioRate:48000 },
-  hq:  { key:"hq",  label:"Alta Calidad", width:1920, height:1080, videoBitrate:4000, maxrate:4500, bufsize:9000, fps:30, level:"4.2", audioBitrate:160, audioRate:48000 }
-};
-
-const State = {
-  file: null,
-  profile: "std",
-  hqFps: 30,
-  ffmpeg: null,
-  engineLoaded: false,
-  converting: false,
-  logVisible: false,
-  timer: null,
-  startTime: 0,
-  result: null // { m3u8Text, segments:[{name,data}], previewUrl, baseName }
-};
-
-/* ---------------- Helpers ---------------- */
-function bytesToSize(bytes){
-  if(!bytes) return "0 B";
-  const units = ["B","KB","MB","GB"];
-  let i = Math.floor(Math.log(bytes)/Math.log(1024));
-  return (bytes/Math.pow(1024,i)).toFixed(2)+" "+units[i];
-}
-function toast(msg, isError){
-  const box = document.getElementById("toastBox");
-  const el = document.createElement("div");
-  el.className = "toast text-sm px-4 py-2.5 rounded-lg shadow-xl border " + (isError ? "bg-red-950 border-red-500/40 text-red-300" : "bg-[#161d31] border-white/10 text-white");
-  el.textContent = msg;
-  box.appendChild(el);
-  setTimeout(()=>el.remove(), 4200);
-}
-function getActiveConfig(){
-  const base = PROFILES[State.profile];
-  const fps = State.profile === "hq" ? State.hqFps : 30;
-  const gop = fps * 2;
-  return { ...base, fps, gop, segment:4, loudness:-14 };
-}
-
-/* ---------------- Config summary render ---------------- */
-function renderConfigSummary(){
-  const c = getActiveConfig();
-  const items = [
-    ["Resolución", c.width+"×"+c.height],
-    ["Framerate", c.fps+" fps"],
-    ["Video Bitrate", c.videoBitrate+" kbps"],
-    ["Maxrate/Bufsize", c.maxrate+"k / "+c.bufsize+"k"],
-    ["Códec Video", "H.264 High · Nivel "+c.level],
-    ["GOP (Keyframe)", c.gop+" frames (2s fijo)"],
-    ["Códec Audio", "AAC-LC"],
-    ["Audio Bitrate", c.audioBitrate+" kbps stereo"],
-    ["Frecuencia Audio", c.audioRate+" Hz"],
-    ["Segmento HLS", c.segment+"s"],
-    ["Loudness", c.loudness+" LUFS"],
-    ["Perfil activo", c.label]
-  ];
-  document.getElementById("configSummary").innerHTML = items.map(([k,v])=>`
-    <div class="bg-white/5 rounded-lg px-3 py-2">
-      <p class="text-gray-500 uppercase tracking-wide text-[9px] font-bold">${k}</p>
-      <p class="text-white font-semibold mt-0.5">${v}</p>
-    </div>`).join("");
-}
-
-/* ---------------- File handling ---------------- */
-const dropzone = document.getElementById("dropzone");
-const fileInput = document.getElementById("fileInput");
-
-dropzone.addEventListener("click", ()=>fileInput.click());
-["dragenter","dragover"].forEach(ev=>dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.add("drag"); }));
-["dragleave","drop"].forEach(ev=>dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.classList.remove("drag"); }));
-dropzone.addEventListener("drop", e=>{
-  const f = e.dataTransfer.files[0];
-  if(f) handleFile(f);
-});
-fileInput.addEventListener("change", e=>{
-  const f = e.target.files[0];
-  if(f) handleFile(f);
-});
-
-function handleFile(file){
-  const errBox = document.getElementById("fileError");
-  errBox.classList.add("hidden");
-  if(file.size > MAX_SIZE){
-    errBox.textContent = "❌ El archivo supera el límite de 3 GB ("+bytesToSize(file.size)+"). Elige un archivo más pequeño.";
-    errBox.classList.remove("hidden");
-    return;
-  }
-  const validExt = /\.(mp4|mov|mkv|avi|webm|m4v)$/i.test(file.name);
-  const validType = /^video\//.test(file.type) || file.type === "";
-  if(!validExt && !validType){
-    errBox.textContent = "❌ Formato no reconocido. Usa MP4, MOV, MKV, AVI o WEBM.";
-    errBox.classList.remove("hidden");
-    return;
-  }
-
-  State.file = file;
-  document.getElementById("fileInfoCard").classList.remove("hidden");
-  document.getElementById("fileNameText").textContent = file.name;
-  document.getElementById("fileMetaText").textContent = bytesToSize(file.size)+" · "+(file.type||"video");
-
-  // read metadata (resolution/duration) for info only
-  const tmpUrl = URL.createObjectURL(file);
-  const tmpVideo = document.createElement("video");
-  tmpVideo.preload = "metadata";
-  tmpVideo.src = tmpUrl;
-  tmpVideo.onloadedmetadata = ()=>{
-    const mins = Math.floor(tmpVideo.duration/60);
-    const secs = Math.floor(tmpVideo.duration%60).toString().padStart(2,"0");
-    document.getElementById("fileMetaText").textContent =
-      bytesToSize(file.size)+" · "+tmpVideo.videoWidth+"×"+tmpVideo.videoHeight+" · "+mins+":"+secs+" min";
-    URL.revokeObjectURL(tmpUrl);
+  const manifest = {
+    name: "Doodle World Lens - Cámara Caricatura",
+    short_name: "Doodle Lens",
+    description: "Cámara en tiempo real con efecto 100% caricatura / cartoon, cámara frontal y trasera.",
+    start_url: ".",
+    scope: ".",
+    display: "standalone",
+    orientation: "portrait",
+    background_color: "#0b0620",
+    theme_color: "#0b0620",
+    icons: [
+      { src: iconDataUri, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+      { src: iconDataUri, sizes: "512x512", type: "image/svg+xml", purpose: "any" },
+      { src: iconDataUri, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" }
+    ]
   };
-  tmpVideo.onerror = ()=>{ URL.revokeObjectURL(tmpUrl); };
+  try {
+    const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    document.getElementById('manifestLink').setAttribute('href', URL.createObjectURL(manifestBlob));
+  } catch(e) { console.warn('Manifest no soportado:', e); }
 
-  document.getElementById("profileSection").classList.remove("opacity-40","pointer-events-none");
-  document.getElementById("convertSection").classList.remove("opacity-40","pointer-events-none");
-  renderConfigSummary();
-  toast("Archivo cargado correctamente ✅");
-}
+  if ('serviceWorker' in navigator) {
+    const swCode = `
+      const CACHE = 'doodle-world-lens-v1';
+      self.addEventListener('install', e => { self.skipWaiting(); });
+      self.addEventListener('activate', e => { self.clients.claim(); });
+      self.addEventListener('fetch', e => {
+        if (e.request.method !== 'GET') return;
+        e.respondWith(
+          caches.open(CACHE).then(async cache => {
+            try {
+              const fresh = await fetch(e.request);
+              cache.put(e.request, fresh.clone());
+              return fresh;
+            } catch (err) {
+              const cached = await cache.match(e.request);
+              return cached || Promise.reject(err);
+            }
+          })
+        );
+      });
+    `;
+    try {
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      const swURL = URL.createObjectURL(swBlob);
+      navigator.serviceWorker.register(swURL).catch(err => console.warn('SW no registrado:', err));
+    } catch(e) { console.warn('SW no soportado en este contexto:', e); }
+  }
 
-/* ---------------- Engine loading (FFmpeg WASM, single-thread core, no server needed) ---------------- */
-async function loadEngine(){
-  if(State.engineLoaded) return;
-  setEngineStatus("loading", "Cargando motor de conversión...");
-
-  const { FFmpeg } = FFmpegWASM;
-  const { toBlobURL } = FFmpegUtil;
-
-  const ffmpeg = new FFmpeg();
-  ffmpeg.on("log", ({ message }) => appendLog(message));
-  ffmpeg.on("progress", ({ progress }) => updateProgressUI(progress));
-
-  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm")
+  // Instalación (Android/desktop Chrome)
+  let deferredPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBtn.classList.remove('hidden');
   });
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBtn.classList.add('hidden');
+  });
+  window.addEventListener('appinstalled', () => installBtn.classList.add('hidden'));
 
-  State.ffmpeg = ffmpeg;
-  State.engineLoaded = true;
-  setEngineStatus("ready", "Motor listo");
-}
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (isIOS && !isStandalone) document.getElementById('iosInstallTip').classList.remove('hidden');
 
-function setEngineStatus(state, text){
-  const dot = document.getElementById("engineStatusDot");
-  const label = document.getElementById("engineStatusText");
-  label.textContent = text;
-  dot.className = "w-2 h-2 rounded-full " + (state==="ready" ? "bg-green-400" : state==="loading" ? "bg-yellow-400 animate-pulse" : state==="error" ? "bg-red-500" : "bg-gray-500");
-}
+  /* ============================================================
+     1. Referencias DOM
+     ============================================================ */
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('glcanvas');
+  const startScreen = document.getElementById('startScreen');
+  const loadingScreen = document.getElementById('loadingScreen');
+  const errorScreen = document.getElementById('errorScreen');
+  const errorMsg = document.getElementById('errorMsg');
+  const topBar = document.getElementById('topBar');
+  const bottomBar = document.getElementById('bottomBar');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const recBadge = document.getElementById('recBadge');
+  const recTimer = document.getElementById('recTimer');
+  const flashFx = document.getElementById('flashFx');
+  const thumbImg = document.getElementById('thumbImg');
+  const thumbPlaceholder = document.getElementById('thumbPlaceholder');
 
-function appendLog(msg){
-  const box = document.getElementById("logBox");
-  box.textContent += msg + "\n";
-  box.scrollTop = box.scrollHeight;
-}
+  /* ============================================================
+     2. Estado / configuración del efecto
+     ============================================================ */
+  const cfg = {
+    levels: 6, edgeStrength: 0.85, edgeThreshold: 0.22,
+    saturation: 1.5, smooth: 0.55, brightness: 0.02, contrast: 1.1,
+    quality: 'medium', mic: true
+  };
+  const DEFAULTS = Object.assign({}, cfg);
+  const qualityPx = { low: 480, medium: 720, high: 1080 };
 
-function updateProgressUI(progress){
-  const pct = Math.min(100, Math.max(0, Math.round((progress||0)*100)));
-  document.getElementById("progressBarFill").style.width = pct+"%";
-  document.getElementById("progressPct").textContent = pct+"%";
-  document.getElementById("progressLabel").textContent = pct < 100 ? "Convirtiendo video a HLS..." : "Finalizando...";
-}
+  let facingMode = 'environment';
+  let currentStream = null;
+  let currentTrack = null;
+  let mirror = false;
 
-/* ---------------- Build ffmpeg command from active profile ---------------- */
-function buildCommand(inputName, cfg){
-  const vf = `scale=${cfg.width}:${cfg.height}:force_original_aspect_ratio=decrease,pad=${cfg.width}:${cfg.height}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${cfg.fps}`;
-  return [
-    "-i", inputName,
-    "-vf", vf,
-    "-c:v", "libx264",
-    "-profile:v", "high",
-    "-level", String(cfg.level),
-    "-pix_fmt", "yuv420p",
-    "-b:v", cfg.videoBitrate+"k",
-    "-maxrate", cfg.maxrate+"k",
-    "-bufsize", cfg.bufsize+"k",
-    "-g", String(cfg.gop),
-    "-keyint_min", String(cfg.gop),
-    "-sc_threshold", "0",
-    "-c:a", "aac",
-    "-b:a", cfg.audioBitrate+"k",
-    "-ar", String(cfg.audioRate),
-    "-ac", "2",
-    "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
-    "-f", "hls",
-    "-hls_time", String(cfg.segment),
-    "-hls_playlist_type", "vod",
-    "-hls_flags", "independent_segments",
-    "-start_number", "0",
-    "-hls_segment_filename", "segment_%03d.ts",
-    "playlist.m3u8"
-  ];
-}
+  /* ============================================================
+     3. WebGL
+     ============================================================ */
+  let gl, quadBuffer;
+  let progBlur, progBlend, progFinal;
+  let videoTex;
+  let internalW = 640, internalH = 360;
+  let fboBlur, fboSmoothA, fboSmoothB;
+  let flip = false; // ping-pong
+  let cropRect = [0, 0, 1, 1];
+  let rafId = null;
 
-/* ---------------- Conversion flow ---------------- */
-async function startConversion(){
-  if(!State.file){ toast("Primero selecciona un video.", true); return; }
-  if(State.converting) return;
-  State.converting = true;
-
-  document.getElementById("btnConvert").classList.add("hidden");
-  document.getElementById("btnCancel").classList.remove("hidden");
-  document.getElementById("progressBox").classList.remove("hidden");
-  document.getElementById("logBox").textContent = "";
-  updateProgressUI(0);
-
-  State.startTime = Date.now();
-  State.timer = setInterval(()=>{
-    const secs = Math.floor((Date.now()-State.startTime)/1000);
-    document.getElementById("elapsedTimeText").textContent = "Tiempo transcurrido: "+secs+"s";
-  }, 1000);
-
-  try{
-    document.getElementById("progressLabel").textContent = "Cargando motor FFmpeg (WebAssembly)...";
-    await loadEngine();
-
-    const ext = (State.file.name.split(".").pop()||"mp4").toLowerCase();
-    const inputName = "input."+ext;
-    const cfg = getActiveConfig();
-
-    document.getElementById("progressLabel").textContent = "Leyendo archivo...";
-    const { fetchFile } = FFmpegUtil;
-    const data = await fetchFile(State.file);
-    await State.ffmpeg.writeFile(inputName, data);
-
-    document.getElementById("progressLabel").textContent = "Convirtiendo video a HLS...";
-    const args = buildCommand(inputName, cfg);
-    appendLog("Comando: ffmpeg "+args.join(" "));
-    await State.ffmpeg.exec(args);
-
-    document.getElementById("progressLabel").textContent = "Empaquetando resultado...";
-    const entries = await State.ffmpeg.listDir("/");
-    const segmentEntries = entries
-      .filter(e => !e.isDir && /^segment_\d+\.ts$/i.test(e.name))
-      .sort((a,b)=> parseInt(a.name.match(/\d+/)[0]) - parseInt(b.name.match(/\d+/)[0]));
-
-    if(segmentEntries.length === 0) throw new Error("No se generaron segmentos HLS. Verifica que el archivo sea un video válido.");
-
-    const m3u8Data = await State.ffmpeg.readFile("playlist.m3u8");
-    const m3u8Text = new TextDecoder().decode(m3u8Data);
-
-    const segments = [];
-    for(const entry of segmentEntries){
-      const segData = await State.ffmpeg.readFile(entry.name);
-      segments.push({ name: entry.name, data: segData });
+  const VS = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main(){
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
     }
+  `;
 
-    // cleanup MEMFS to free memory for next conversion
-    try{ await State.ffmpeg.deleteFile(inputName); }catch(e){}
-    try{ await State.ffmpeg.deleteFile("playlist.m3u8"); }catch(e){}
-    for(const s of segmentEntries){ try{ await State.ffmpeg.deleteFile(s.name); }catch(e){} }
+  const FS_BLUR = `
+    precision mediump float;
+    varying vec2 vUv;
+    uniform sampler2D uTex;
+    uniform vec2 uTexel;
+    uniform vec4 uCrop;
+    uniform float uMirror;
+    void main(){
+      vec2 uv = vUv;
+      uv.x = mix(uv.x, 1.0 - uv.x, uMirror);
+      vec2 base = uCrop.xy + uv * uCrop.zw;
+      vec3 sum = vec3(0.0);
+      sum += texture2D(uTex, base + vec2(-uTexel.x,-uTexel.y)).rgb;
+      sum += texture2D(uTex, base + vec2( 0.0,     -uTexel.y)).rgb * 2.0;
+      sum += texture2D(uTex, base + vec2( uTexel.x,-uTexel.y)).rgb;
+      sum += texture2D(uTex, base + vec2(-uTexel.x, 0.0)).rgb * 2.0;
+      sum += texture2D(uTex, base).rgb * 4.0;
+      sum += texture2D(uTex, base + vec2( uTexel.x, 0.0)).rgb * 2.0;
+      sum += texture2D(uTex, base + vec2(-uTexel.x, uTexel.y)).rgb;
+      sum += texture2D(uTex, base + vec2( 0.0,      uTexel.y)).rgb * 2.0;
+      sum += texture2D(uTex, base + vec2( uTexel.x, uTexel.y)).rgb;
+      vec3 color = sum / 16.0;
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
 
-    const baseName = State.file.name.replace(/\.[^.]+$/, "");
-    State.result = { m3u8Text, segments, baseName, profile: cfg.label };
+  const FS_BLEND = `
+    precision mediump float;
+    varying vec2 vUv;
+    uniform sampler2D uCurr;
+    uniform sampler2D uPrev;
+    uniform float uSmooth;
+    void main(){
+      vec3 c = texture2D(uCurr, vUv).rgb;
+      vec3 p = texture2D(uPrev, vUv).rgb;
+      float diff = length(c - p);
+      float motion = clamp(diff * 3.5, 0.0, 1.0);
+      float alpha = uSmooth * (1.0 - motion);
+      vec3 result = mix(c, p, alpha);
+      gl_FragColor = vec4(result, 1.0);
+    }
+  `;
 
-    showResult();
-    toast("¡Conversión completada correctamente! ✅");
-  }catch(err){
-    console.error(err);
-    appendLog("ERROR: "+(err && err.message ? err.message : String(err)));
-    toast("Ocurrió un error durante la conversión: "+(err && err.message ? err.message : "revisa el registro técnico."), true);
-  }finally{
-    State.converting = false;
-    clearInterval(State.timer);
-    document.getElementById("btnConvert").classList.remove("hidden");
-    document.getElementById("btnCancel").classList.add("hidden");
+  const FS_FINAL = `
+    precision mediump float;
+    varying vec2 vUv;
+    uniform sampler2D uTex;
+    uniform vec2 uTexel;
+    uniform float uLevels;
+    uniform float uEdgeThreshold;
+    uniform float uEdgeStrength;
+    uniform float uSaturation;
+    uniform float uBrightness;
+    uniform float uContrast;
+
+    float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+    void main(){
+      vec3 color = texture2D(uTex, vUv).rgb;
+
+      float l = luma(color);
+      color = mix(vec3(l), color, uSaturation);
+      color = (color - 0.5) * uContrast + 0.5 + uBrightness;
+      color = clamp(color, 0.0, 1.0);
+
+      vec3 posterized = floor(color * uLevels + 0.5) / uLevels;
+
+      float tl = luma(texture2D(uTex, vUv + vec2(-uTexel.x,-uTexel.y)).rgb);
+      float t  = luma(texture2D(uTex, vUv + vec2( 0.0,     -uTexel.y)).rgb);
+      float tr = luma(texture2D(uTex, vUv + vec2( uTexel.x,-uTexel.y)).rgb);
+      float l_ = luma(texture2D(uTex, vUv + vec2(-uTexel.x, 0.0)).rgb);
+      float r_ = luma(texture2D(uTex, vUv + vec2( uTexel.x, 0.0)).rgb);
+      float bl = luma(texture2D(uTex, vUv + vec2(-uTexel.x, uTexel.y)).rgb);
+      float b  = luma(texture2D(uTex, vUv + vec2( 0.0,      uTexel.y)).rgb);
+      float br = luma(texture2D(uTex, vUv + vec2( uTexel.x, uTexel.y)).rgb);
+
+      float gx = -tl - 2.0*l_ - bl + tr + 2.0*r_ + br;
+      float gy = -tl - 2.0*t  - tr + bl + 2.0*b  + br;
+      float edge = sqrt(gx*gx + gy*gy);
+      float edgeFactor = smoothstep(uEdgeThreshold, uEdgeThreshold + 0.15, edge) * uEdgeStrength;
+
+      vec3 finalColor = mix(posterized, vec3(0.04, 0.04, 0.07), edgeFactor);
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `;
+
+  function createShader(type, src){
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+      console.error(gl.getShaderInfoLog(s));
+    }
+    return s;
   }
-}
+  function createProgram(vsSrc, fsSrc){
+    const p = gl.createProgram();
+    gl.attachShader(p, createShader(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(p, createShader(gl.FRAGMENT_SHADER, fsSrc));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)){
+      console.error(gl.getProgramInfoLog(p));
+    }
+    return p;
+  }
+  function createFBOTexture(w, h){
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { tex, fbo };
+  }
 
-async function cancelConversion(){
-  if(!State.converting) return;
-  try{
-    if(State.ffmpeg){ State.ffmpeg.terminate(); }
-  }catch(e){}
-  State.engineLoaded = false;
-  State.ffmpeg = null;
-  State.converting = false;
-  clearInterval(State.timer);
-  setEngineStatus("idle", "Motor no cargado");
-  document.getElementById("btnConvert").classList.remove("hidden");
-  document.getElementById("btnCancel").classList.add("hidden");
-  document.getElementById("progressBox").classList.add("hidden");
-  toast("Conversión cancelada.", true);
-}
+  function initGL(){
+    gl = canvas.getContext('webgl', { preserveDrawingBuffer: true, antialias: false }) ||
+         canvas.getContext('experimental-webgl', { preserveDrawingBuffer: true });
+    if (!gl){ showError('Tu navegador no soporta WebGL, necesario para el efecto caricatura.'); return false; }
 
-/* ---------------- Result: preview + zip download ---------------- */
-function showResult(){
-  document.getElementById("resultSection").classList.remove("hidden");
-  document.getElementById("resultSection").scrollIntoView({ behavior:"smooth", block:"start" });
+    quadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
 
-  const { m3u8Text, segments, profile } = State.result;
+    progBlur = createProgram(VS, FS_BLUR);
+    progBlend = createProgram(VS, FS_BLEND);
+    progFinal = createProgram(VS, FS_FINAL);
 
-  // Build a preview-only playlist pointing to blob URLs (playback only, not for download)
-  let previewM3u8 = m3u8Text;
-  const blobUrls = [];
-  segments.forEach(seg=>{
-    const blobUrl = URL.createObjectURL(new Blob([seg.data.buffer], { type:"video/mp2t" }));
-    blobUrls.push(blobUrl);
-    previewM3u8 = previewM3u8.replace(seg.name, blobUrl);
+    videoTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, videoTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    return true;
+  }
+
+  function bindQuad(program){
+    const loc = gl.getAttribLocation(program, 'aPos');
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  }
+
+  function resizeCanvasAndBuffers(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.round(canvas.clientWidth * dpr);
+    const h = Math.round(canvas.clientHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h){
+      canvas.width = w; canvas.height = h;
+    }
+    const target = qualityPx[cfg.quality] || 720;
+    const scale = Math.min(1, target / Math.max(w, h));
+    internalW = Math.max(160, Math.round(w * scale));
+    internalH = Math.max(160, Math.round(h * scale));
+
+    if (gl){
+      if (fboBlur){ gl.deleteFramebuffer(fboBlur.fbo); gl.deleteTexture(fboBlur.tex); }
+      if (fboSmoothA){ gl.deleteFramebuffer(fboSmoothA.fbo); gl.deleteTexture(fboSmoothA.tex); }
+      if (fboSmoothB){ gl.deleteFramebuffer(fboSmoothB.fbo); gl.deleteTexture(fboSmoothB.tex); }
+      fboBlur = createFBOTexture(internalW, internalH);
+      fboSmoothA = createFBOTexture(internalW, internalH);
+      fboSmoothB = createFBOTexture(internalW, internalH);
+    }
+    computeCrop();
+  }
+
+  function computeCrop(){
+    if (!video.videoWidth || !video.videoHeight) { cropRect = [0,0,1,1]; return; }
+    const canvasAspect = canvas.width / canvas.height;
+    const videoAspect = video.videoWidth / video.videoHeight;
+    let cx=0, cy=0, cw=1, ch=1;
+    if (videoAspect > canvasAspect){
+      cw = canvasAspect / videoAspect;
+      cx = (1 - cw) / 2;
+    } else {
+      ch = videoAspect / canvasAspect;
+      cy = (1 - ch) / 2;
+    }
+    cropRect = [cx, cy, cw, ch];
+  }
+
+  function renderFrame(){
+    rafId = requestAnimationFrame(renderFrame);
+    if (!gl || video.readyState < 2 || video.videoWidth === 0) return;
+
+    gl.bindTexture(gl.TEXTURE_2D, videoTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+
+    const texelVideo = [1 / video.videoWidth, 1 / video.videoHeight];
+    const texelInternal = [1 / internalW, 1 / internalH];
+
+    // Pass 1: blur + crop (cover fit, sin distorsion) + mirror
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboBlur.fbo);
+    gl.viewport(0,0,internalW, internalH);
+    gl.useProgram(progBlur);
+    bindQuad(progBlur);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, videoTex);
+    gl.uniform1i(gl.getUniformLocation(progBlur, 'uTex'), 0);
+    gl.uniform2fv(gl.getUniformLocation(progBlur, 'uTexel'), texelVideo);
+    gl.uniform4fv(gl.getUniformLocation(progBlur, 'uCrop'), cropRect);
+    gl.uniform1f(gl.getUniformLocation(progBlur, 'uMirror'), mirror ? 1.0 : 0.0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+    // Pass 2: temporal blend (estabilizacion) ping-pong
+    const prev = flip ? fboSmoothA : fboSmoothB;
+    const curr = flip ? fboSmoothB : fboSmoothA;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, curr.fbo);
+    gl.viewport(0,0,internalW, internalH);
+    gl.useProgram(progBlend);
+    bindQuad(progBlend);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fboBlur.tex);
+    gl.uniform1i(gl.getUniformLocation(progBlend, 'uCurr'), 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, prev.tex);
+    gl.uniform1i(gl.getUniformLocation(progBlend, 'uPrev'), 1);
+    gl.uniform1f(gl.getUniformLocation(progBlend, 'uSmooth'), cfg.smooth);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    flip = !flip;
+
+    // Pass 3: cartoon final -> pantalla
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0,0,canvas.width, canvas.height);
+    gl.useProgram(progFinal);
+    bindQuad(progFinal);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, curr.tex);
+    gl.uniform1i(gl.getUniformLocation(progFinal, 'uTex'), 0);
+    gl.uniform2fv(gl.getUniformLocation(progFinal, 'uTexel'), texelInternal);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uLevels'), cfg.levels);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uEdgeThreshold'), cfg.edgeThreshold);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uEdgeStrength'), cfg.edgeStrength);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uSaturation'), cfg.saturation);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uBrightness'), cfg.brightness);
+    gl.uniform1f(gl.getUniformLocation(progFinal, 'uContrast'), cfg.contrast);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  /* ============================================================
+     4. Cámara
+     ============================================================ */
+  async function startCamera(newFacing){
+    stopCamera();
+    loadingScreen.classList.remove('hidden');
+    try {
+      const constraints = {
+        video: { facingMode: { ideal: newFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: cfg.mic
+      };
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch(e){
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: newFacing }, audio: false });
+      }
+      currentStream = stream;
+      currentTrack = stream.getVideoTracks()[0];
+      facingMode = newFacing;
+      mirror = (newFacing === 'user');
+      video.srcObject = stream;
+      await new Promise(res => { video.onloadedmetadata = () => { video.play().then(res).catch(res); }; });
+      resizeCanvasAndBuffers();
+      setupTrackFeatures();
+      loadingScreen.classList.add('hidden');
+    } catch(err){
+      console.error(err);
+      loadingScreen.classList.add('hidden');
+      let msg = 'No se pudo acceder a la cámara. Verifica los permisos.';
+      if (err && err.name === 'NotAllowedError') msg = 'Permiso de cámara denegado. Actívalo en los ajustes del navegador.';
+      if (err && err.name === 'NotFoundError') msg = 'No se encontró ninguna cámara en este dispositivo.';
+      if (location.protocol !== 'https:' && location.hostname !== 'localhost') msg = 'Esta app necesita HTTPS para usar la cámara.';
+      showError(msg);
+    }
+  }
+
+  function stopCamera(){
+    if (currentStream){
+      currentStream.getTracks().forEach(t => t.stop());
+      currentStream = null; currentTrack = null;
+    }
+  }
+
+  function setupTrackFeatures(){
+    const torchBtn = document.getElementById('torchBtn');
+    const zoomWrap = document.getElementById('zoomWrap');
+    const zoomRange = document.getElementById('zoomRange');
+    torchBtn.classList.add('hidden');
+    zoomWrap.classList.add('hidden');
+    if (!currentTrack || !currentTrack.getCapabilities) return;
+    let caps = {};
+    try { caps = currentTrack.getCapabilities(); } catch(e){ caps = {}; }
+
+    if (caps.torch){
+      torchBtn.classList.remove('hidden');
+      torchBtn.dataset.on = "0";
+      torchBtn.onclick = async () => {
+        const on = torchBtn.dataset.on === "1";
+        try {
+          await currentTrack.applyConstraints({ advanced: [{ torch: !on }] });
+          torchBtn.dataset.on = on ? "0" : "1";
+          torchBtn.classList.toggle('bg-amber-400', !on);
+        } catch(e){ console.warn('Torch no disponible', e); }
+      };
+    }
+    if (caps.zoom){
+      zoomWrap.classList.remove('hidden');
+      zoomRange.min = caps.zoom.min; zoomRange.max = caps.zoom.max;
+      zoomRange.step = caps.zoom.step || 0.1;
+      zoomRange.value = currentTrack.getSettings().zoom || caps.zoom.min;
+      document.getElementById('valZoom').textContent = zoomRange.value;
+      zoomRange.oninput = async () => {
+        document.getElementById('valZoom').textContent = zoomRange.value;
+        try { await currentTrack.applyConstraints({ advanced: [{ zoom: parseFloat(zoomRange.value) }] }); } catch(e){}
+      };
+    }
+  }
+
+  document.getElementById('flipBtn').addEventListener('click', () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment';
+    startCamera(next);
   });
-  const previewBlob = new Blob([previewM3u8], { type:"application/vnd.apple.mpegurl" });
-  const previewUrl = URL.createObjectURL(previewBlob);
 
-  const video = document.getElementById("previewVideo");
-  if(window.Hls && Hls.isSupported()){
-    const hls = new Hls();
-    hls.loadSource(previewUrl);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, ()=>{ video.play().catch(()=>{}); });
-  } else if(video.canPlayType("application/vnd.apple.mpegurl")){
-    video.src = previewUrl;
-    video.play().catch(()=>{});
-  } else {
-    toast("Tu navegador no soporta previsualización HLS, pero el paquete descargable funcionará en cualquier reproductor compatible.", true);
+  /* ============================================================
+     5. UI: pantallas
+     ============================================================ */
+  function showError(msg){
+    errorMsg.textContent = msg;
+    errorScreen.classList.remove('hidden');
   }
-
-  // files list
-  let totalBytes = m3u8Text.length;
-  const listEl = document.getElementById("resultFilesList");
-  let rows = `<div class="flex justify-between"><span class="mono">playlist.m3u8</span><span>${bytesToSize(m3u8Text.length)}</span></div>`;
-  segments.forEach(s=>{
-    totalBytes += s.data.byteLength;
-    rows += `<div class="flex justify-between"><span class="mono">${s.name}</span><span>${bytesToSize(s.data.byteLength)}</span></div>`;
+  document.getElementById('retryBtn').addEventListener('click', () => {
+    errorScreen.classList.add('hidden');
+    boot();
   });
-  listEl.innerHTML = rows;
 
-  document.getElementById("resultSummaryText").textContent =
-    `Perfil: ${profile} · ${segments.length} segmentos · Tamaño total: ${bytesToSize(totalBytes)}`;
-}
+  document.getElementById('startBtn').addEventListener('click', async () => {
+    startScreen.classList.add('hidden');
+    await boot();
+  });
 
-async function downloadZip(){
-  if(!State.result) return;
-  const { m3u8Text, segments, baseName, profile } = State.result;
-  const zip = new JSZip();
-  zip.file("playlist.m3u8", m3u8Text);
-  segments.forEach(s=> zip.file(s.name, s.data));
-  zip.file("LEEME.txt",
-`Paquete HLS generado por HLS Converter Pro
-Perfil: ${profile}
-
-INSTRUCCIONES DE DESPLIEGUE:
-1. Sube "playlist.m3u8" y todos los archivos "segment_XXX.ts" a la MISMA carpeta en tu servidor o CDN.
-2. Apunta tu reproductor (hls.js, Video.js, Plyr, Safari nativo, Smart TV, etc.) al archivo playlist.m3u8.
-3. No renombres los archivos .ts ni cambies su ubicación relativa respecto al .m3u8.
-
-Este paquete usa GOP fijo, segmentos de 4 segundos y bitrate controlado (maxrate/bufsize),
-ideal para transmisión de TV en vivo 24/7 sin tirones entre segmentos.
-`);
-  toast("Generando ZIP, un momento...");
-  const blob = await zip.generateAsync({ type:"blob" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${baseName}_${profile.replace(/\s+/g,"_")}_HLS.zip`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
-  toast("Descarga iniciada ✅");
-}
-
-/* ---------------- Public API ---------------- */
-window.App = {
-  selectProfile(key){
-    State.profile = key;
-    document.getElementById("cardStd").classList.toggle("selected", key==="std");
-    document.getElementById("cardHq").classList.toggle("selected", key==="hq");
-    document.getElementById("fpsSelector").classList.toggle("hidden", key!=="hq");
-    renderConfigSummary();
-  },
-  setHqFps(fps, evt){
-    State.hqFps = fps;
-    document.querySelectorAll(".fps-btn").forEach(b=>b.classList.remove("selected"));
-    const target = (evt && evt.target) || window.event && window.event.target;
-    if(target) target.classList.add("selected");
-    renderConfigSummary();
-  },
-  resetFile(){
-    State.file = null;
-    document.getElementById("fileInfoCard").classList.add("hidden");
-    document.getElementById("fileInput").value = "";
-    document.getElementById("profileSection").classList.add("opacity-40","pointer-events-none");
-    document.getElementById("convertSection").classList.add("opacity-40","pointer-events-none");
-  },
-  startConversion,
-  cancelConversion,
-  downloadZip,
-  toggleLog(){
-    State.logVisible = !State.logVisible;
-    document.getElementById("logBox").classList.toggle("hidden", !State.logVisible);
-  },
-  resetAll(){
-    document.getElementById("resultSection").classList.add("hidden");
-    document.getElementById("progressBox").classList.add("hidden");
-    this.resetFile();
-    State.result = null;
-    window.scrollTo({ top:0, behavior:"smooth" });
+  async function boot(){
+    if (!gl){ if (!initGL()) return; }
+    await startCamera(facingMode);
+    if (currentStream){
+      topBar.classList.remove('hidden');
+      bottomBar.classList.remove('hidden');
+      if (!rafId) renderFrame();
+    }
   }
-};
 
-/* ---------------- Init ---------------- */
-if(location.protocol === "file:"){
-  document.getElementById("fileProtocolWarning").classList.remove("hidden");
-}
-renderConfigSummary();
+  window.addEventListener('resize', resizeCanvasAndBuffers);
+  window.addEventListener('orientationchange', () => setTimeout(resizeCanvasAndBuffers, 300));
+
+  /* ============================================================
+     6. Ajustes (settings panel)
+     ============================================================ */
+  const settingsBtn = document.getElementById('settingsBtn');
+  const closeSettings = document.getElementById('closeSettings');
+  settingsBtn.addEventListener('click', () => {
+    settingsPanel.classList.remove('hidden');
+    requestAnimationFrame(() => settingsPanel.querySelector('div').parentElement.classList.remove('translate-y-full'));
+    settingsPanel.classList.remove('translate-y-full');
+  });
+  closeSettings.addEventListener('click', () => {
+    settingsPanel.classList.add('translate-y-full');
+    setTimeout(() => settingsPanel.classList.add('hidden'), 250);
+  });
+
+  const sliderMap = [
+    ['levels','valLevels'], ['edgeStrength','valEdgeStrength'], ['edgeThreshold','valEdgeThreshold'],
+    ['saturation','valSaturation'], ['smooth','valSmooth'], ['brightness','valBrightness'], ['contrast','valContrast']
+  ];
+  function syncSlidersFromCfg(){
+    sliderMap.forEach(([key, valId]) => {
+      const el = document.getElementById(key);
+      el.value = cfg[key];
+      document.getElementById(valId).textContent = cfg[key];
+    });
+    document.getElementById('quality').value = cfg.quality;
+    document.getElementById('micToggle').checked = cfg.mic;
+  }
+  sliderMap.forEach(([key, valId]) => {
+    document.getElementById(key).addEventListener('input', (e) => {
+      cfg[key] = parseFloat(e.target.value);
+      document.getElementById(valId).textContent = cfg[key];
+    });
+  });
+  document.getElementById('quality').addEventListener('change', (e) => {
+    cfg.quality = e.target.value;
+    resizeCanvasAndBuffers();
+  });
+  document.getElementById('micToggle').addEventListener('change', (e) => {
+    cfg.mic = e.target.checked;
+  });
+  document.getElementById('resetDefaults').addEventListener('click', () => {
+    Object.assign(cfg, DEFAULTS);
+    syncSlidersFromCfg();
+    resizeCanvasAndBuffers();
+  });
+  syncSlidersFromCfg();
+
+  document.getElementById('fullscreenBtn').addEventListener('click', () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement){
+      (el.requestFullscreen && el.requestFullscreen()) || (el.webkitRequestFullscreen && el.webkitRequestFullscreen());
+      if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(()=>{});
+    } else {
+      document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen && document.webkitExitFullscreen());
+    }
+  });
+
+  /* ============================================================
+     7. Captura de foto
+     ============================================================ */
+  let lastMediaURL = null, lastMediaType = null;
+
+  function flash(){
+    flashFx.style.transition = 'none';
+    flashFx.style.opacity = '0.85';
+    requestAnimationFrame(() => {
+      flashFx.style.transition = 'opacity .35s ease';
+      flashFx.style.opacity = '0';
+    });
+  }
+
+  document.getElementById('photoBtn').addEventListener('click', () => {
+    if (!gl) return;
+    flash();
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      lastMediaURL = url; lastMediaType = 'image';
+      updateThumb(url, 'image');
+      openPreview(url, 'image');
+    }, 'image/png', 0.95);
+  });
+
+  function updateThumb(url, type){
+    thumbPlaceholder.classList.add('hidden');
+    thumbImg.classList.remove('hidden');
+    if (type === 'image') thumbImg.src = url;
+    else thumbImg.src = ''; // for video se deja icono o poster si se desea
+  }
+
+  document.getElementById('thumbBtn').addEventListener('click', () => {
+    if (lastMediaURL) openPreview(lastMediaURL, lastMediaType);
+  });
+
+  /* ============================================================
+     8. Grabación de video
+     ============================================================ */
+  let recorder = null, chunks = [], recording = false, recStartTime = 0, recInterval = null;
+
+  function getSupportedMime(){
+    const options = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4'
+    ];
+    for (const o of options){
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(o)) return o;
+    }
+    return '';
+  }
+
+  function startRecording(){
+    if (!canvas.captureStream){ showError('Tu navegador no soporta grabación de video desde canvas.'); return; }
+    const canvasStream = canvas.captureStream(30);
+    let tracks = [...canvasStream.getVideoTracks()];
+    if (currentStream && cfg.mic){
+      tracks = tracks.concat(currentStream.getAudioTracks());
+    }
+    const combined = new MediaStream(tracks);
+    const mimeType = getSupportedMime();
+    try {
+      recorder = mimeType ? new MediaRecorder(combined, { mimeType, videoBitsPerSecond: 4000000 }) : new MediaRecorder(combined);
+    } catch(e){
+      recorder = new MediaRecorder(combined);
+    }
+    chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      lastMediaURL = url; lastMediaType = 'video';
+      updateThumb(url, 'video');
+      openPreview(url, 'video');
+    };
+    recorder.start();
+    recording = true;
+    recStartTime = Date.now();
+    recBadge.classList.remove('hidden');
+    recBadge.classList.add('flex');
+    document.getElementById('recordBtn').textContent = '⏹';
+    document.getElementById('recordBtn').classList.add('bg-white');
+    document.getElementById('recordBtn').classList.remove('bg-red-500');
+    recInterval = setInterval(() => {
+      const secs = Math.floor((Date.now() - recStartTime) / 1000);
+      const m = String(Math.floor(secs / 60)).padStart(2,'0');
+      const s = String(secs % 60).padStart(2,'0');
+      recTimer.textContent = m + ':' + s;
+    }, 250);
+  }
+
+  function stopRecording(){
+    if (recorder && recording){
+      recorder.stop();
+    }
+    recording = false;
+    clearInterval(recInterval);
+    recBadge.classList.add('hidden');
+    recBadge.classList.remove('flex');
+    document.getElementById('recordBtn').textContent = '⏺';
+    document.getElementById('recordBtn').classList.remove('bg-white');
+    document.getElementById('recordBtn').classList.add('bg-red-500');
+    recTimer.textContent = '00:00';
+  }
+
+  document.getElementById('recordBtn').addEventListener('click', () => {
+    if (!recording) startRecording(); else stopRecording();
+  });
+
+  /* ============================================================
+     9. Preview / compartir / descargar
+     ============================================================ */
+  const previewModal = document.getElementById('previewModal');
+  const previewImg = document.getElementById('previewImg');
+  const previewVideo = document.getElementById('previewVideo');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const shareBtn = document.getElementById('shareBtn');
+
+  function openPreview(url, type){
+    previewModal.classList.remove('hidden');
+    previewImg.classList.add('hidden');
+    previewVideo.classList.add('hidden');
+    previewVideo.pause();
+    if (type === 'image'){
+      previewImg.src = url;
+      previewImg.classList.remove('hidden');
+      downloadBtn.href = url;
+      downloadBtn.download = 'doodle-world-' + Date.now() + '.png';
+    } else {
+      previewVideo.src = url;
+      previewVideo.classList.remove('hidden');
+      downloadBtn.href = url;
+      downloadBtn.download = 'doodle-world-' + Date.now() + '.webm';
+    }
+    shareBtn.classList.toggle('hidden', !navigator.share);
+    shareBtn.onclick = async () => {
+      try {
+        const resp = await fetch(url);
+        const blob = await resp.blob();
+        const file = new File([blob], type === 'image' ? 'doodle.png' : 'doodle.webm', { type: blob.type });
+        if (navigator.canShare && navigator.canShare({ files: [file] })){
+          await navigator.share({ files: [file], title: 'Doodle World Lens' });
+        } else {
+          await navigator.share({ title: 'Doodle World Lens', url });
+        }
+      } catch(e){ console.warn('Compartir cancelado', e); }
+    };
+  }
+  document.getElementById('closePreview').addEventListener('click', () => {
+    previewModal.classList.add('hidden');
+    previewVideo.pause();
+  });
+  document.getElementById('discardBtn').addEventListener('click', () => {
+    previewModal.classList.add('hidden');
+    previewVideo.pause();
+  });
+
+  /* ============================================================
+     10. Init inicial (tamaño de canvas antes de tener cámara)
+     ============================================================ */
+  function initialCanvasSize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(canvas.clientWidth * dpr) || window.innerWidth;
+    canvas.height = Math.round(canvas.clientHeight * dpr) || window.innerHeight;
+  }
+  initialCanvasSize();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && recording) stopRecording();
+  });
 
 })();
 </script>
-
 </body>
 </html>
